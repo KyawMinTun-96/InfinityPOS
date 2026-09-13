@@ -1,0 +1,6 @@
+@InfinityPOS.API_HostAddress = http://localhost:5023
+
+GET {{InfinityPOS.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

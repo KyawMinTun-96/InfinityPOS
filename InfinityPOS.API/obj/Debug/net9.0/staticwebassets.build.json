@@ -1,0 +1,12 @@
+{
+  "Version": 1,
+  "Hash": "5Q8CHNylYL0eLGhwhU7UgeTJdHOocioXaDDPllF4flY=",
+  "Source": "InfinityPOS.API",
+  "BasePath": "_content/InfinityPOS.API",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": [],
+  "Endpoints": []
+}
