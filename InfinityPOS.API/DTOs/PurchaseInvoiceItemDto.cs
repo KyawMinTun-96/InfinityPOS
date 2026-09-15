@@ -1,0 +1,14 @@
+namespace InfinityPOS.API.DTOs;
+
+public class PurchaseInvoiceItemDto
+{
+    public long PurchaseInvoiceItemId { get; set; }
+    public long PurchaseInvoiceId { get; set; }
+    public int ProductId { get; set; }
+
+    public decimal Quantity { get; set; }
+    public decimal UnitCost { get; set; }
+    public decimal DiscountAmount { get; set; }
+    public decimal TaxAmount { get; set; }
+    public decimal? TotalAmount { get; set; }
+}
