@@ -29,6 +29,7 @@ public class PurchaseInvoiceItemsController : ControllerBase
                 ProductId = x.ProductId,
                 Quantity = x.Quantity,
                 UnitCost = x.UnitCost,
+                SalePrice = x.SalePrice,
                 DiscountAmount = x.DiscountAmount,
                 TaxAmount = x.TaxAmount,
                 TotalAmount = x.TotalAmount
@@ -51,6 +52,7 @@ public class PurchaseInvoiceItemsController : ControllerBase
                 ProductId = x.ProductId,
                 Quantity = x.Quantity,
                 UnitCost = x.UnitCost,
+                SalePrice = x.SalePrice,
                 DiscountAmount = x.DiscountAmount,
                 TaxAmount = x.TaxAmount,
                 TotalAmount = x.TotalAmount
@@ -94,6 +96,7 @@ public class PurchaseInvoiceItemsController : ControllerBase
                 ProductId = x.ProductId,
                 Quantity = x.Quantity,
                 UnitCost = x.UnitCost,
+                SalePrice = x.SalePrice,
                 DiscountAmount = x.DiscountAmount,
                 TaxAmount = x.TaxAmount,
                 TotalAmount = x.TotalAmount
@@ -137,6 +140,14 @@ public class PurchaseInvoiceItemsController : ControllerBase
             return BadRequest(new
             {
                 message = "UnitCost cannot be negative."
+            });
+        }
+
+        if (dto.SalePrice < 0)
+        {
+            return BadRequest(new
+            {
+                message = "SalePrice cannot be negative."
             });
         }
 
@@ -193,6 +204,7 @@ public class PurchaseInvoiceItemsController : ControllerBase
             ProductId = dto.ProductId,
             Quantity = dto.Quantity,
             UnitCost = dto.UnitCost,
+            SalePrice = dto.SalePrice,
             DiscountAmount = dto.DiscountAmount,
             TaxAmount = dto.TaxAmount,
             TotalAmount = totalAmount
@@ -209,6 +221,7 @@ public class PurchaseInvoiceItemsController : ControllerBase
             ProductId = item.ProductId,
             Quantity = item.Quantity,
             UnitCost = item.UnitCost,
+            SalePrice = item.SalePrice,
             DiscountAmount = item.DiscountAmount,
             TaxAmount = item.TaxAmount,
             TotalAmount = item.TotalAmount
@@ -256,6 +269,14 @@ public class PurchaseInvoiceItemsController : ControllerBase
             return BadRequest(new
             {
                 message = "UnitCost cannot be negative."
+            });
+        }
+
+        if (dto.SalePrice < 0)
+        {
+            return BadRequest(new
+            {
+                message = "SalePrice cannot be negative."
             });
         }
 
@@ -319,6 +340,7 @@ public class PurchaseInvoiceItemsController : ControllerBase
         item.ProductId = dto.ProductId;
         item.Quantity = dto.Quantity;
         item.UnitCost = dto.UnitCost;
+        item.SalePrice = dto.SalePrice;
         item.DiscountAmount = dto.DiscountAmount;
         item.TaxAmount = dto.TaxAmount;
         item.TotalAmount = totalAmount;
@@ -332,6 +354,7 @@ public class PurchaseInvoiceItemsController : ControllerBase
             ProductId = item.ProductId,
             Quantity = item.Quantity,
             UnitCost = item.UnitCost,
+            SalePrice = item.SalePrice,
             DiscountAmount = item.DiscountAmount,
             TaxAmount = item.TaxAmount,
             TotalAmount = item.TotalAmount

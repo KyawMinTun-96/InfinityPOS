@@ -1,0 +1,22 @@
+.product-table-row {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ant-table-tbody > tr.product-table-row:hover > td {
+  background: #e6f4ff !important;
+  color: #1677ff;
+}
+
+.ant-table-tbody
+  > tr.product-table-row:hover
+  > td
+  strong {
+  color: #0958d9;
+}
+
+.ant-table-tbody
+  > tr.product-table-row:active
+  > td {
+  background: #bae0ff !important;
+}

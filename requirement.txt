@@ -1,0 +1,7 @@
+sale voucher ရဲ့ item search box မှာ product code နဲ့လည်းရှာမယ် barcode နဲ့လည်းရှာမယ်
+sale voucher နဲ့ sale item list မှာ qty ကိုထည့်လိုက်တာနဲ့  stock လက်ကျန်ရှိမရှိ alert ပေးရမယ်
+sale voucher နဲ့ sale item list မှာ purchase အလိုက်ဝယ်ထားခဲ့တဲ့ ဝယ်စေ◌ျးနဲ့ရောင်းစေ◌ျးတွေကိုကြိုက်ရာရွေးချယ်ရောင်းနိုင်ရမယ် default သည် first in first out စနစ်ဖြင့်သာလုပ်ရမယ်
+product မှာလည်း ဝယ်စေ◌ျးရောင်းစေ◌ျးသတ်မှတ်နိုင်အောင်ထည့်ပေးရမယ်
+
+purchase voucher မှာလည်း product item ရဲ့ ဝယ်စေ◌ျးရောင်းစှေးသတ်မှတ်နိုင်ရမယ်
+Sale voucher ရော purchase voucher  ရော voucher no ကို system က auto တပ်ပေးမယ် voucher no ကျော်လို့မရဘူး ထပ်လို့မရဘူး Sale ဆိုရင် sv purchase ဆို Pv နဲ့စမယ် အနောက်မှာ date ကိန်းစဉ်လိုက်မယ် ပြီးတော့ နေ့အလိုက်ပထမဆုံးဖွင့်တဲ့ voucher ကို 01ကနေထပ်လိုက်မယ်

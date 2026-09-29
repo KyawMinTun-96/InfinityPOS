@@ -6,6 +6,9 @@ public class CreateSalesInvoiceItemDto
     public int ProductId { get; set; }
     public long? ProductPriceId { get; set; }
 
+    // Selected stock batch
+    public long? ProductStockBatchId { get; set; }
+
     public decimal Quantity { get; set; }
     public decimal UnitPrice { get; set; }
 

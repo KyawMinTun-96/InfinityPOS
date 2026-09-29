@@ -43,9 +43,11 @@ public partial class SalesInvoice
 
     public virtual DocumentStatus DocumentStatus { get; set; } = null!;
 
-    public virtual ICollection<SalesInvoiceItem> SalesInvoiceItems { get; set; } = new List<SalesInvoiceItem>();
+    public virtual ICollection<SalesInvoiceItem> SalesInvoiceItems { get; set; }
+        = new List<SalesInvoiceItem>();
 
-    public virtual ICollection<SalesPayment> SalesPayments { get; set; } = new List<SalesPayment>();
+    public virtual ICollection<SalesPayment> SalesPayments { get; set; }
+        = new List<SalesPayment>();
 
     public virtual Warehouse Warehouse { get; set; } = null!;
 }

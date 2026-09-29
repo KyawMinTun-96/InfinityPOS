@@ -47,6 +47,8 @@ public partial class Product
 
     public virtual ICollection<PurchaseInvoiceItem> PurchaseInvoiceItems { get; set; } = new List<PurchaseInvoiceItem>();
 
+    public virtual ICollection<ProductStockBatch> ProductStockBatches { get; set; } = new List<ProductStockBatch>();
+
     public virtual ICollection<SalesInvoiceItem> SalesInvoiceItems { get; set; } = new List<SalesInvoiceItem>();
 
     public virtual ICollection<StockAdjustmentItem> StockAdjustmentItems { get; set; } = new List<StockAdjustmentItem>();

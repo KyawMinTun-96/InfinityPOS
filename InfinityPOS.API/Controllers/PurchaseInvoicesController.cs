@@ -2,9 +2,11 @@ using InfinityPOS.API.Data;
 using InfinityPOS.API.DTOs;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 
 namespace InfinityPOS.API.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class PurchaseInvoicesController : ControllerBase
@@ -21,21 +23,59 @@ public class PurchaseInvoicesController : ControllerBase
     public async Task<ActionResult<IEnumerable<PurchaseInvoiceDto>>> GetPurchaseInvoices()
     {
         var invoices = await _context.PurchaseInvoices
+            .AsNoTracking()
             .OrderByDescending(x => x.PurchaseInvoiceId)
             .Select(x => new PurchaseInvoiceDto
             {
                 PurchaseInvoiceId = x.PurchaseInvoiceId,
                 InvoiceNumber = x.InvoiceNumber,
                 InvoiceDate = x.InvoiceDate,
+
                 SupplierId = x.SupplierId,
+                SupplierName = x.SupplierId.HasValue
+                    ? _context.Suppliers
+                        .Where(s => s.SupplierId == x.SupplierId.Value)
+                        .Select(s => s.SupplierName)
+                        .FirstOrDefault()
+                    : null,
+
                 WarehouseId = x.WarehouseId,
+                WarehouseName = _context.Warehouses
+                    .Where(w => w.WarehouseId == x.WarehouseId)
+                    .Select(w => w.WarehouseName)
+                    .FirstOrDefault(),
+
                 CurrencyId = x.CurrencyId,
+                CurrencyCode = _context.Currencies
+                    .Where(c => c.CurrencyId == x.CurrencyId)
+                    .Select(c => c.CurrencyCode)
+                    .FirstOrDefault(),
+
+                CurrencyName = _context.Currencies
+                    .Where(c => c.CurrencyId == x.CurrencyId)
+                    .Select(c => c.CurrencyName)
+                    .FirstOrDefault(),
+
                 ExchangeRate = x.ExchangeRate,
                 SubTotal = x.SubTotal,
                 DiscountAmount = x.DiscountAmount,
                 TaxAmount = x.TaxAmount,
                 TotalAmount = x.TotalAmount,
+
                 DocumentStatusId = x.DocumentStatusId,
+
+                StatusCode = _context.DocumentStatuses
+                    .Where(s =>
+                        s.DocumentStatusId == x.DocumentStatusId)
+                    .Select(s => s.StatusCode)
+                    .FirstOrDefault(),
+
+                StatusName = _context.DocumentStatuses
+                    .Where(s =>
+                        s.DocumentStatusId == x.DocumentStatusId)
+                    .Select(s => s.StatusName)
+                    .FirstOrDefault(),
+
                 Notes = x.Notes,
                 CreatedAt = x.CreatedAt,
                 CreatedByUserId = x.CreatedByUserId
@@ -50,21 +90,59 @@ public class PurchaseInvoicesController : ControllerBase
     public async Task<ActionResult<PurchaseInvoiceDto>> GetPurchaseInvoice(long id)
     {
         var invoice = await _context.PurchaseInvoices
+            .AsNoTracking()
             .Where(x => x.PurchaseInvoiceId == id)
             .Select(x => new PurchaseInvoiceDto
             {
                 PurchaseInvoiceId = x.PurchaseInvoiceId,
                 InvoiceNumber = x.InvoiceNumber,
                 InvoiceDate = x.InvoiceDate,
+
                 SupplierId = x.SupplierId,
+                SupplierName = x.SupplierId.HasValue
+                    ? _context.Suppliers
+                        .Where(s => s.SupplierId == x.SupplierId.Value)
+                        .Select(s => s.SupplierName)
+                        .FirstOrDefault()
+                    : null,
+
                 WarehouseId = x.WarehouseId,
+                WarehouseName = _context.Warehouses
+                    .Where(w => w.WarehouseId == x.WarehouseId)
+                    .Select(w => w.WarehouseName)
+                    .FirstOrDefault(),
+
                 CurrencyId = x.CurrencyId,
+                CurrencyCode = _context.Currencies
+                    .Where(c => c.CurrencyId == x.CurrencyId)
+                    .Select(c => c.CurrencyCode)
+                    .FirstOrDefault(),
+
+                CurrencyName = _context.Currencies
+                    .Where(c => c.CurrencyId == x.CurrencyId)
+                    .Select(c => c.CurrencyName)
+                    .FirstOrDefault(),
+
                 ExchangeRate = x.ExchangeRate,
                 SubTotal = x.SubTotal,
                 DiscountAmount = x.DiscountAmount,
                 TaxAmount = x.TaxAmount,
                 TotalAmount = x.TotalAmount,
+
                 DocumentStatusId = x.DocumentStatusId,
+
+                StatusCode = _context.DocumentStatuses
+                    .Where(s =>
+                        s.DocumentStatusId == x.DocumentStatusId)
+                    .Select(s => s.StatusCode)
+                    .FirstOrDefault(),
+
+                StatusName = _context.DocumentStatuses
+                    .Where(s =>
+                        s.DocumentStatusId == x.DocumentStatusId)
+                    .Select(s => s.StatusName)
+                    .FirstOrDefault(),
+
                 Notes = x.Notes,
                 CreatedAt = x.CreatedAt,
                 CreatedByUserId = x.CreatedByUserId
@@ -151,7 +229,6 @@ public class PurchaseInvoicesController : ControllerBase
             });
         }
 
-        // Warehouse validation
         var warehouseExists = await _context.Warehouses
             .AnyAsync(x =>
                 x.WarehouseId == dto.WarehouseId &&
@@ -165,7 +242,6 @@ public class PurchaseInvoicesController : ControllerBase
             });
         }
 
-        // Currency validation
         var currencyExists = await _context.Currencies
             .AnyAsync(x =>
                 x.CurrencyId == dto.CurrencyId &&
@@ -179,7 +255,6 @@ public class PurchaseInvoicesController : ControllerBase
             });
         }
 
-        // Supplier validation
         if (dto.SupplierId.HasValue)
         {
             var supplierExists = await _context.Suppliers
@@ -196,7 +271,6 @@ public class PurchaseInvoicesController : ControllerBase
             }
         }
 
-        // Document Status validation
         var statusExists = await _context.DocumentStatuses
             .AnyAsync(x =>
                 x.DocumentStatusId == dto.DocumentStatusId &&
@@ -210,7 +284,6 @@ public class PurchaseInvoicesController : ControllerBase
             });
         }
 
-        // Created By User validation
         if (dto.CreatedByUserId.HasValue)
         {
             var userExists = await _context.Users
@@ -248,24 +321,66 @@ public class PurchaseInvoicesController : ControllerBase
         _context.PurchaseInvoices.Add(invoice);
         await _context.SaveChangesAsync();
 
-        var result = new PurchaseInvoiceDto
-        {
-            PurchaseInvoiceId = invoice.PurchaseInvoiceId,
-            InvoiceNumber = invoice.InvoiceNumber,
-            InvoiceDate = invoice.InvoiceDate,
-            SupplierId = invoice.SupplierId,
-            WarehouseId = invoice.WarehouseId,
-            CurrencyId = invoice.CurrencyId,
-            ExchangeRate = invoice.ExchangeRate,
-            SubTotal = invoice.SubTotal,
-            DiscountAmount = invoice.DiscountAmount,
-            TaxAmount = invoice.TaxAmount,
-            TotalAmount = invoice.TotalAmount,
-            DocumentStatusId = invoice.DocumentStatusId,
-            Notes = invoice.Notes,
-            CreatedAt = invoice.CreatedAt,
-            CreatedByUserId = invoice.CreatedByUserId
-        };
+        var result = await _context.PurchaseInvoices
+            .AsNoTracking()
+            .Where(x =>
+                x.PurchaseInvoiceId == invoice.PurchaseInvoiceId)
+            .Select(x => new PurchaseInvoiceDto
+            {
+                PurchaseInvoiceId = x.PurchaseInvoiceId,
+                InvoiceNumber = x.InvoiceNumber,
+                InvoiceDate = x.InvoiceDate,
+
+                SupplierId = x.SupplierId,
+                SupplierName = x.SupplierId.HasValue
+                    ? _context.Suppliers
+                        .Where(s => s.SupplierId == x.SupplierId.Value)
+                        .Select(s => s.SupplierName)
+                        .FirstOrDefault()
+                    : null,
+
+                WarehouseId = x.WarehouseId,
+                WarehouseName = _context.Warehouses
+                    .Where(w => w.WarehouseId == x.WarehouseId)
+                    .Select(w => w.WarehouseName)
+                    .FirstOrDefault(),
+
+                CurrencyId = x.CurrencyId,
+                CurrencyCode = _context.Currencies
+                    .Where(c => c.CurrencyId == x.CurrencyId)
+                    .Select(c => c.CurrencyCode)
+                    .FirstOrDefault(),
+
+                CurrencyName = _context.Currencies
+                    .Where(c => c.CurrencyId == x.CurrencyId)
+                    .Select(c => c.CurrencyName)
+                    .FirstOrDefault(),
+
+                ExchangeRate = x.ExchangeRate,
+                SubTotal = x.SubTotal,
+                DiscountAmount = x.DiscountAmount,
+                TaxAmount = x.TaxAmount,
+                TotalAmount = x.TotalAmount,
+
+                DocumentStatusId = x.DocumentStatusId,
+
+                StatusCode = _context.DocumentStatuses
+                    .Where(s =>
+                        s.DocumentStatusId == x.DocumentStatusId)
+                    .Select(s => s.StatusCode)
+                    .FirstOrDefault(),
+
+                StatusName = _context.DocumentStatuses
+                    .Where(s =>
+                        s.DocumentStatusId == x.DocumentStatusId)
+                    .Select(s => s.StatusName)
+                    .FirstOrDefault(),
+
+                Notes = x.Notes,
+                CreatedAt = x.CreatedAt,
+                CreatedByUserId = x.CreatedByUserId
+            })
+            .FirstAsync();
 
         return CreatedAtAction(
             nameof(GetPurchaseInvoice),
@@ -294,7 +409,8 @@ public class PurchaseInvoicesController : ControllerBase
         {
             return BadRequest(new
             {
-                message = "WarehouseId, CurrencyId and DocumentStatusId are required."
+                message =
+                    "WarehouseId, CurrencyId and DocumentStatusId are required."
             });
         }
 
@@ -318,7 +434,8 @@ public class PurchaseInvoicesController : ControllerBase
         }
 
         var invoice = await _context.PurchaseInvoices
-            .FirstOrDefaultAsync(x => x.PurchaseInvoiceId == id);
+            .FirstOrDefaultAsync(x =>
+                x.PurchaseInvoiceId == id);
 
         if (invoice == null)
         {
@@ -409,7 +526,8 @@ public class PurchaseInvoicesController : ControllerBase
             {
                 return BadRequest(new
                 {
-                    message = "CreatedByUserId not found or inactive."
+                    message =
+                        "CreatedByUserId not found or inactive."
                 });
             }
         }
@@ -430,32 +548,77 @@ public class PurchaseInvoicesController : ControllerBase
 
         await _context.SaveChangesAsync();
 
-        return Ok(new PurchaseInvoiceDto
-        {
-            PurchaseInvoiceId = invoice.PurchaseInvoiceId,
-            InvoiceNumber = invoice.InvoiceNumber,
-            InvoiceDate = invoice.InvoiceDate,
-            SupplierId = invoice.SupplierId,
-            WarehouseId = invoice.WarehouseId,
-            CurrencyId = invoice.CurrencyId,
-            ExchangeRate = invoice.ExchangeRate,
-            SubTotal = invoice.SubTotal,
-            DiscountAmount = invoice.DiscountAmount,
-            TaxAmount = invoice.TaxAmount,
-            TotalAmount = invoice.TotalAmount,
-            DocumentStatusId = invoice.DocumentStatusId,
-            Notes = invoice.Notes,
-            CreatedAt = invoice.CreatedAt,
-            CreatedByUserId = invoice.CreatedByUserId
-        });
+        var result = await _context.PurchaseInvoices
+            .AsNoTracking()
+            .Where(x =>
+                x.PurchaseInvoiceId == invoice.PurchaseInvoiceId)
+            .Select(x => new PurchaseInvoiceDto
+            {
+                PurchaseInvoiceId = x.PurchaseInvoiceId,
+                InvoiceNumber = x.InvoiceNumber,
+                InvoiceDate = x.InvoiceDate,
+
+                SupplierId = x.SupplierId,
+                SupplierName = x.SupplierId.HasValue
+                    ? _context.Suppliers
+                        .Where(s => s.SupplierId == x.SupplierId.Value)
+                        .Select(s => s.SupplierName)
+                        .FirstOrDefault()
+                    : null,
+
+                WarehouseId = x.WarehouseId,
+                WarehouseName = _context.Warehouses
+                    .Where(w => w.WarehouseId == x.WarehouseId)
+                    .Select(w => w.WarehouseName)
+                    .FirstOrDefault(),
+
+                CurrencyId = x.CurrencyId,
+                CurrencyCode = _context.Currencies
+                    .Where(c => c.CurrencyId == x.CurrencyId)
+                    .Select(c => c.CurrencyCode)
+                    .FirstOrDefault(),
+
+                CurrencyName = _context.Currencies
+                    .Where(c => c.CurrencyId == x.CurrencyId)
+                    .Select(c => c.CurrencyName)
+                    .FirstOrDefault(),
+
+                ExchangeRate = x.ExchangeRate,
+                SubTotal = x.SubTotal,
+                DiscountAmount = x.DiscountAmount,
+                TaxAmount = x.TaxAmount,
+                TotalAmount = x.TotalAmount,
+
+                DocumentStatusId = x.DocumentStatusId,
+
+                StatusCode = _context.DocumentStatuses
+                    .Where(s =>
+                        s.DocumentStatusId == x.DocumentStatusId)
+                    .Select(s => s.StatusCode)
+                    .FirstOrDefault(),
+
+                StatusName = _context.DocumentStatuses
+                    .Where(s =>
+                        s.DocumentStatusId == x.DocumentStatusId)
+                    .Select(s => s.StatusName)
+                    .FirstOrDefault(),
+
+                Notes = x.Notes,
+                CreatedAt = x.CreatedAt,
+                CreatedByUserId = x.CreatedByUserId
+            })
+            .FirstAsync();
+
+        return Ok(result);
     }
 
-    // DELETE: api/purchaseinvoices/1
-    [HttpDelete("{id:long}")]
-    public async Task<IActionResult> DeletePurchaseInvoice(long id)
+    // POST: api/purchaseinvoices/1/post
+    [HttpPost("{id:long}/post")]
+    public async Task<IActionResult> PostPurchaseInvoice(long id)
     {
         var invoice = await _context.PurchaseInvoices
-            .FirstOrDefaultAsync(x => x.PurchaseInvoiceId == id);
+            .FirstOrDefaultAsync(x =>
+                x.PurchaseInvoiceId == id);
 
         if (invoice == null)
         {
@@ -465,8 +628,316 @@ public class PurchaseInvoicesController : ControllerBase
             });
         }
 
-        // Purchase Invoice does not have IsActive.
-        // Use VOID status instead of physical delete.
+        // Get Purchase document statuses
+        var draftStatus = await _context.DocumentStatuses
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x =>
+                x.DocumentType == "PURCHASE" &&
+                x.StatusCode == "DRAFT");
+
+        var postedStatus = await _context.DocumentStatuses
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x =>
+                x.DocumentType == "PURCHASE" &&
+                x.StatusCode == "POSTED");
+
+        if (draftStatus == null ||
+            postedStatus == null)
+        {
+            return BadRequest(new
+            {
+                message =
+                    "Purchase DRAFT or POSTED status not found."
+            });
+        }
+
+        // Only DRAFT invoices can be posted
+        if (invoice.DocumentStatusId !=
+            draftStatus.DocumentStatusId)
+        {
+            return BadRequest(new
+            {
+                message =
+                    "Only DRAFT purchase invoices can be posted."
+            });
+        }
+
+        // Load invoice items
+        var items = await _context.PurchaseInvoiceItems
+            .Where(x =>
+                x.PurchaseInvoiceId == id)
+            .ToListAsync();
+
+        if (items.Count == 0)
+        {
+            return BadRequest(new
+            {
+                message =
+                    "Cannot post purchase invoice without items."
+            });
+        }
+
+        // Prevent duplicate stock posting
+        var existingMovement = await _context.StockMovements
+            .AsNoTracking()
+            .AnyAsync(x =>
+                x.ReferenceType == "PURCHASE_INVOICE" &&
+                x.ReferenceId == id);
+
+        if (existingMovement)
+        {
+            return BadRequest(new
+            {
+                message =
+                    "Stock movement already exists for this purchase invoice."
+            });
+        }
+
+        // Prevent duplicate stock batch posting
+        var existingBatch = await _context.ProductStockBatches
+            .AsNoTracking()
+            .AnyAsync(x =>
+                x.PurchaseInvoiceItem.PurchaseInvoiceId == id);
+
+        if (existingBatch)
+        {
+            return BadRequest(new
+            {
+                message =
+                    "Stock batch already exists for this purchase invoice."
+            });
+        }
+
+        // Validate warehouse
+        var warehouse = await _context.Warehouses
+            .FirstOrDefaultAsync(x =>
+                x.WarehouseId == invoice.WarehouseId &&
+                x.IsActive);
+
+        if (warehouse == null)
+        {
+            return BadRequest(new
+            {
+                message =
+                    "Warehouse not found or inactive."
+            });
+        }
+
+        // Validate currency
+        var currency = await _context.Currencies
+            .FirstOrDefaultAsync(x =>
+                x.CurrencyId == invoice.CurrencyId &&
+                x.IsActive);
+
+        if (currency == null)
+        {
+            return BadRequest(new
+            {
+                message =
+                    "Currency not found or inactive."
+            });
+        }
+
+        // Get PURCHASE_IN movement type
+        var purchaseInType = await _context.StockMovementTypes
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x =>
+                x.MovementCode == "PURCHASE_IN" &&
+                x.Direction == "IN");
+
+        if (purchaseInType == null)
+        {
+            return BadRequest(new
+            {
+                message =
+                    "PURCHASE_IN stock movement type not found."
+            });
+        }
+
+        // Validate all products before changing stock
+        foreach (var item in items)
+        {
+            if (item.Quantity <= 0)
+            {
+                return BadRequest(new
+                {
+                    message =
+                        $"Invalid quantity for PurchaseInvoiceItemId {item.PurchaseInvoiceItemId}."
+                });
+            }
+
+            if (item.UnitCost < 0)
+            {
+                return BadRequest(new
+                {
+                    message =
+                        $"Invalid unit cost for PurchaseInvoiceItemId {item.PurchaseInvoiceItemId}."
+                });
+            }
+
+            if (item.SalePrice < 0)
+            {
+                return BadRequest(new
+                {
+                    message =
+                        $"Invalid sale price for PurchaseInvoiceItemId {item.PurchaseInvoiceItemId}."
+                });
+            }
+
+            var productExists = await _context.Products
+                .AnyAsync(x =>
+                    x.ProductId == item.ProductId &&
+                    x.IsActive);
+
+            if (!productExists)
+            {
+                return BadRequest(new
+                {
+                    message =
+                        $"Product ID {item.ProductId} not found or inactive."
+                });
+            }
+        }
+
+        await using var transaction =
+            await _context.Database.BeginTransactionAsync();
+
+        try
+        {
+            foreach (var item in items)
+            {
+                var stockBalance = await _context.StockBalances
+                    .FirstOrDefaultAsync(x =>
+                        x.ProductId == item.ProductId &&
+                        x.WarehouseId == invoice.WarehouseId);
+
+                if (stockBalance == null)
+                {
+                    stockBalance = new Data.Models.StockBalance
+                    {
+                        ProductId = item.ProductId,
+                        WarehouseId = invoice.WarehouseId,
+                        Quantity = 0,
+                        AverageCost = 0,
+                        UpdatedAt = DateTime.Now
+                    };
+
+                    _context.StockBalances.Add(stockBalance);
+                }
+
+                var oldQuantity = stockBalance.Quantity;
+                var oldAverageCost = stockBalance.AverageCost;
+
+                var newQuantity =
+                    oldQuantity + item.Quantity;
+
+                if (newQuantity > 0)
+                {
+                    stockBalance.AverageCost =
+                        (
+                            (oldQuantity * oldAverageCost) +
+                            (item.Quantity * item.UnitCost)
+                        ) / newQuantity;
+                }
+
+                stockBalance.Quantity = newQuantity;
+                stockBalance.UpdatedAt = DateTime.Now;
+
+                // Create stock movement
+                var movement = new Data.Models.StockMovement
+                {
+                    ProductId = item.ProductId,
+                    WarehouseId = invoice.WarehouseId,
+                    StockMovementTypeId =
+                        purchaseInType.StockMovementTypeId,
+                    Quantity = item.Quantity,
+                    UnitCost = item.UnitCost,
+                    ReferenceType = "PURCHASE_INVOICE",
+                    ReferenceId = invoice.PurchaseInvoiceId,
+                    MovementDate = invoice.InvoiceDate,
+                    Notes =
+                        $"Purchase Invoice {invoice.InvoiceNumber}",
+                    CreatedByUserId =
+                        invoice.CreatedByUserId
+                };
+
+                _context.StockMovements.Add(movement);
+
+                // Create stock batch
+                var stockBatch = new Data.Models.ProductStockBatch
+                {
+                    ProductId = item.ProductId,
+                    WarehouseId = invoice.WarehouseId,
+                    PurchaseInvoiceItemId =
+                        item.PurchaseInvoiceItemId,
+                    CostPrice = item.UnitCost,
+                    SalePrice = item.SalePrice,
+                    OriginalQuantity = item.Quantity,
+                    RemainingQuantity = item.Quantity,
+                    CurrencyId = invoice.CurrencyId,
+                    CreatedAt = DateTime.Now,
+                    IsActive = true
+                };
+
+                _context.ProductStockBatches.Add(stockBatch);
+            }
+
+            // Change invoice status only after stock processing
+            invoice.DocumentStatusId =
+                postedStatus.DocumentStatusId;
+
+            await _context.SaveChangesAsync();
+
+            await transaction.CommitAsync();
+
+            return Ok(new
+            {
+                message =
+                    "Purchase invoice posted successfully.",
+                purchaseInvoiceId =
+                    invoice.PurchaseInvoiceId,
+                invoiceNumber =
+                    invoice.InvoiceNumber,
+                documentStatusId =
+                    invoice.DocumentStatusId,
+                statusCode =
+                    "POSTED",
+                stockMovementType =
+                    "PURCHASE_IN",
+                stockBatchCreated =
+                    true,
+                itemCount =
+                    items.Count
+            });
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+
+            return StatusCode(500, new
+            {
+                message =
+                    "Failed to post purchase invoice. No stock changes were saved."
+            });
+        }
+    }
+
+    // DELETE: api/purchaseinvoices/1
+    [HttpDelete("{id:long}")]
+    public async Task<IActionResult> DeletePurchaseInvoice(long id)
+    {
+        var invoice = await _context.PurchaseInvoices
+            .FirstOrDefaultAsync(x =>
+                x.PurchaseInvoiceId == id);
+
+        if (invoice == null)
+        {
+            return NotFound(new
+            {
+                message = "Purchase invoice not found."
+            });
+        }
+
         var voidStatus = await _context.DocumentStatuses
             .FirstOrDefaultAsync(x =>
                 x.DocumentType == "PURCHASE" &&
@@ -480,13 +951,15 @@ public class PurchaseInvoicesController : ControllerBase
             });
         }
 
-        invoice.DocumentStatusId = voidStatus.DocumentStatusId;
+        invoice.DocumentStatusId =
+            voidStatus.DocumentStatusId;
 
         await _context.SaveChangesAsync();
 
         return Ok(new
         {
-            message = "Purchase invoice voided successfully."
+            message =
+                "Purchase invoice voided successfully."
         });
     }
 }

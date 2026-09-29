@@ -7,6 +7,7 @@ public class CreatePurchaseInvoiceItemDto
 
     public decimal Quantity { get; set; }
     public decimal UnitCost { get; set; }
+    public decimal SalePrice { get; set; }
 
     public decimal DiscountAmount { get; set; } = 0;
     public decimal TaxAmount { get; set; } = 0;

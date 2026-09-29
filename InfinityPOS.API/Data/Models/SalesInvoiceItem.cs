@@ -13,6 +13,8 @@ public partial class SalesInvoiceItem
 
     public long? ProductPriceId { get; set; }
 
+    public long? ProductStockBatchId { get; set; }
+
     public decimal Quantity { get; set; }
 
     public decimal UnitPrice { get; set; }
@@ -32,6 +34,9 @@ public partial class SalesInvoiceItem
     public virtual Product Product { get; set; } = null!;
 
     public virtual ProductPrice? ProductPrice { get; set; }
+
+
+    public virtual ProductStockBatch? ProductStockBatch { get; set; }
 
     public virtual SalesInvoice SalesInvoice { get; set; } = null!;
 }

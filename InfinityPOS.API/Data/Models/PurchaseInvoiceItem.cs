@@ -15,6 +15,8 @@ public partial class PurchaseInvoiceItem
 
     public decimal UnitCost { get; set; }
 
+    public decimal SalePrice { get; set; }
+
     public decimal DiscountAmount { get; set; }
 
     public decimal TaxAmount { get; set; }
@@ -24,4 +26,6 @@ public partial class PurchaseInvoiceItem
     public virtual Product Product { get; set; } = null!;
 
     public virtual PurchaseInvoice PurchaseInvoice { get; set; } = null!;
+
+    public virtual ICollection<ProductStockBatch> ProductStockBatches { get; set; } = new List<ProductStockBatch>();
 }

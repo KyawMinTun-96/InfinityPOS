@@ -29,6 +29,8 @@ public class SalesInvoicesItemsController : ControllerBase
                 SalesInvoiceId = x.SalesInvoiceId,
                 ProductId = x.ProductId,
                 ProductPriceId = x.ProductPriceId,
+                ProductStockBatchId = x.ProductStockBatchId,
+
                 Quantity = x.Quantity,
                 UnitPrice = x.UnitPrice,
                 UnitCost = x.UnitCost,
@@ -64,6 +66,8 @@ public class SalesInvoicesItemsController : ControllerBase
                 SalesInvoiceId = x.SalesInvoiceId,
                 ProductId = x.ProductId,
                 ProductPriceId = x.ProductPriceId,
+                ProductStockBatchId = x.ProductStockBatchId,
+
                 Quantity = x.Quantity,
                 UnitPrice = x.UnitPrice,
                 UnitCost = x.UnitCost,
@@ -120,6 +124,8 @@ public class SalesInvoicesItemsController : ControllerBase
                 SalesInvoiceId = x.SalesInvoiceId,
                 ProductId = x.ProductId,
                 ProductPriceId = x.ProductPriceId,
+                ProductStockBatchId = x.ProductStockBatchId,
+
                 Quantity = x.Quantity,
                 UnitPrice = x.UnitPrice,
                 UnitCost = x.UnitCost,
@@ -152,6 +158,15 @@ public class SalesInvoicesItemsController : ControllerBase
             return BadRequest(new
             {
                 message = "ProductId is required."
+            });
+        }
+
+        if (!dto.ProductStockBatchId.HasValue ||
+            dto.ProductStockBatchId.Value <= 0)
+        {
+            return BadRequest(new
+            {
+                message = "ProductStockBatchId is required."
             });
         }
 
@@ -223,6 +238,42 @@ public class SalesInvoicesItemsController : ControllerBase
             });
         }
 
+        // Validate selected stock batch
+        var stockBatch = await _context.ProductStockBatches
+            .FirstOrDefaultAsync(x =>
+                x.ProductStockBatchId == dto.ProductStockBatchId.Value &&
+                x.ProductId == dto.ProductId &&
+                x.WarehouseId == invoice.WarehouseId &&
+                x.IsActive);
+
+        if (stockBatch == null)
+        {
+            return BadRequest(new
+            {
+                message =
+                    "Selected stock batch not found, inactive, or does not belong to the selected product/warehouse."
+            });
+        }
+
+        if (stockBatch.RemainingQuantity <= 0)
+        {
+            return BadRequest(new
+            {
+                message = "Selected stock batch has no remaining stock."
+            });
+        }
+
+        if (stockBatch.RemainingQuantity < dto.Quantity)
+        {
+            return BadRequest(new
+            {
+                message =
+                    $"Insufficient stock in selected batch. " +
+                    $"Available: {stockBatch.RemainingQuantity}, " +
+                    $"Required: {dto.Quantity}."
+            });
+        }
+
         if (dto.ProductPriceId.HasValue)
         {
             var productPrice = await _context.ProductPrices
@@ -235,7 +286,8 @@ public class SalesInvoicesItemsController : ControllerBase
             {
                 return BadRequest(new
                 {
-                    message = "ProductPrice not found, inactive, or does not belong to the selected product."
+                    message =
+                        "ProductPrice not found, inactive, or does not belong to the selected product."
                 });
             }
         }
@@ -258,6 +310,9 @@ public class SalesInvoicesItemsController : ControllerBase
             SalesInvoiceId = dto.SalesInvoiceId,
             ProductId = dto.ProductId,
             ProductPriceId = dto.ProductPriceId,
+
+            // Selected stock batch
+            ProductStockBatchId = dto.ProductStockBatchId,
 
             Quantity = dto.Quantity,
             UnitPrice = dto.UnitPrice,
@@ -285,6 +340,7 @@ public class SalesInvoicesItemsController : ControllerBase
             SalesInvoiceId = item.SalesInvoiceId,
             ProductId = item.ProductId,
             ProductPriceId = item.ProductPriceId,
+            ProductStockBatchId = item.ProductStockBatchId,
 
             Quantity = item.Quantity,
             UnitPrice = item.UnitPrice,
@@ -331,6 +387,15 @@ public class SalesInvoicesItemsController : ControllerBase
             return BadRequest(new
             {
                 message = "ProductId is required."
+            });
+        }
+
+        if (!dto.ProductStockBatchId.HasValue ||
+            dto.ProductStockBatchId.Value <= 0)
+        {
+            return BadRequest(new
+            {
+                message = "ProductStockBatchId is required."
             });
         }
 
@@ -421,6 +486,34 @@ public class SalesInvoicesItemsController : ControllerBase
             });
         }
 
+        // Validate selected stock batch
+        var stockBatch = await _context.ProductStockBatches
+            .FirstOrDefaultAsync(x =>
+                x.ProductStockBatchId == dto.ProductStockBatchId.Value &&
+                x.ProductId == dto.ProductId &&
+                x.WarehouseId == invoice.WarehouseId &&
+                x.IsActive);
+
+        if (stockBatch == null)
+        {
+            return BadRequest(new
+            {
+                message =
+                    "Selected stock batch not found, inactive, or does not belong to the selected product/warehouse."
+            });
+        }
+
+        if (stockBatch.RemainingQuantity < dto.Quantity)
+        {
+            return BadRequest(new
+            {
+                message =
+                    $"Insufficient stock in selected batch. " +
+                    $"Available: {stockBatch.RemainingQuantity}, " +
+                    $"Required: {dto.Quantity}."
+            });
+        }
+
         if (dto.ProductPriceId.HasValue)
         {
             var productPrice = await _context.ProductPrices
@@ -433,7 +526,8 @@ public class SalesInvoicesItemsController : ControllerBase
             {
                 return BadRequest(new
                 {
-                    message = "ProductPrice not found, inactive, or does not belong to the selected product."
+                    message =
+                        "ProductPrice not found, inactive, or does not belong to the selected product."
                 });
             }
         }
@@ -453,6 +547,7 @@ public class SalesInvoicesItemsController : ControllerBase
 
         item.ProductId = dto.ProductId;
         item.ProductPriceId = dto.ProductPriceId;
+        item.ProductStockBatchId = dto.ProductStockBatchId;
 
         item.Quantity = dto.Quantity;
         item.UnitPrice = dto.UnitPrice;
@@ -475,6 +570,7 @@ public class SalesInvoicesItemsController : ControllerBase
             SalesInvoiceId = item.SalesInvoiceId,
             ProductId = item.ProductId,
             ProductPriceId = item.ProductPriceId,
+            ProductStockBatchId = item.ProductStockBatchId,
 
             Quantity = item.Quantity,
             UnitPrice = item.UnitPrice,
@@ -544,88 +640,88 @@ public class SalesInvoicesItemsController : ControllerBase
         return NoContent();
     }
 
-    // POST: api/salesinvoices/1/recalculate
-[HttpPost("{id:long}/recalculate")]
-public async Task<ActionResult<SalesInvoiceDto>> Recalculate(long id)
-{
-    if (id <= 0)
+    // POST: api/salesinvoiceitems/1/recalculate
+    [HttpPost("{id:long}/recalculate")]
+    public async Task<ActionResult<SalesInvoiceDto>> Recalculate(long id)
     {
-        return BadRequest(new
+        if (id <= 0)
         {
-            message = "Invalid SalesInvoiceId."
-        });
-    }
+            return BadRequest(new
+            {
+                message = "Invalid SalesInvoiceId."
+            });
+        }
 
-    var invoice = await _context.SalesInvoices
-        .FirstOrDefaultAsync(x => x.SalesInvoiceId == id);
+        var invoice = await _context.SalesInvoices
+            .FirstOrDefaultAsync(x => x.SalesInvoiceId == id);
 
-    if (invoice == null)
-    {
-        return NotFound(new
+        if (invoice == null)
         {
-            message = "Sales invoice not found."
-        });
-    }
+            return NotFound(new
+            {
+                message = "Sales invoice not found."
+            });
+        }
 
-    // SALES DRAFT = 1
-    const int draftStatusId = 1;
+        // SALES DRAFT = 1
+        const int draftStatusId = 1;
 
-    if (invoice.DocumentStatusId != draftStatusId)
-    {
-        return BadRequest(new
+        if (invoice.DocumentStatusId != draftStatusId)
         {
-            message = "Only draft sales invoices can be recalculated."
-        });
+            return BadRequest(new
+            {
+                message = "Only draft sales invoices can be recalculated."
+            });
+        }
+
+        var items = await _context.SalesInvoiceItems
+            .Where(x => x.SalesInvoiceId == id)
+            .ToListAsync();
+
+        if (items.Count == 0)
+        {
+            invoice.SubTotal = 0;
+            invoice.DiscountAmount = 0;
+            invoice.TaxAmount = 0;
+            invoice.TotalAmount = 0;
+        }
+        else
+        {
+            invoice.SubTotal = items.Sum(x =>
+                (x.Quantity * x.UnitPrice) - x.DiscountAmount);
+
+            invoice.DiscountAmount = items.Sum(x =>
+                x.DiscountAmount);
+
+            invoice.TaxAmount = items.Sum(x =>
+                x.TaxAmount);
+
+            invoice.TotalAmount = items.Sum(x =>
+                ((x.Quantity * x.UnitPrice) - x.DiscountAmount)
+                + x.TaxAmount);
+        }
+
+        await _context.SaveChangesAsync();
+
+        var result = new SalesInvoiceDto
+        {
+            SalesInvoiceId = invoice.SalesInvoiceId,
+            InvoiceNumber = invoice.InvoiceNumber,
+            InvoiceDate = invoice.InvoiceDate,
+            CustomerId = invoice.CustomerId,
+            WarehouseId = invoice.WarehouseId,
+            CurrencyId = invoice.CurrencyId,
+            ExchangeRate = invoice.ExchangeRate,
+            SubTotal = invoice.SubTotal,
+            DiscountAmount = invoice.DiscountAmount,
+            TaxAmount = invoice.TaxAmount,
+            TotalAmount = invoice.TotalAmount,
+            DocumentStatusId = invoice.DocumentStatusId,
+            Notes = invoice.Notes,
+            CreatedAt = invoice.CreatedAt,
+            CreatedByUserId = invoice.CreatedByUserId
+        };
+
+        return Ok(result);
     }
-
-    var items = await _context.SalesInvoiceItems
-        .Where(x => x.SalesInvoiceId == id)
-        .ToListAsync();
-
-    if (items.Count == 0)
-    {
-        invoice.SubTotal = 0;
-        invoice.DiscountAmount = 0;
-        invoice.TaxAmount = 0;
-        invoice.TotalAmount = 0;
-    }
-    else
-    {
-        invoice.SubTotal = items.Sum(x =>
-            (x.Quantity * x.UnitPrice) - x.DiscountAmount);
-
-        invoice.DiscountAmount = items.Sum(x =>
-            x.DiscountAmount);
-
-        invoice.TaxAmount = items.Sum(x =>
-            x.TaxAmount);
-
-        invoice.TotalAmount = items.Sum(x =>
-            ((x.Quantity * x.UnitPrice) - x.DiscountAmount)
-            + x.TaxAmount);
-    }
-
-    await _context.SaveChangesAsync();
-
-    var result = new SalesInvoiceDto
-    {
-        SalesInvoiceId = invoice.SalesInvoiceId,
-        InvoiceNumber = invoice.InvoiceNumber,
-        InvoiceDate = invoice.InvoiceDate,
-        CustomerId = invoice.CustomerId,
-        WarehouseId = invoice.WarehouseId,
-        CurrencyId = invoice.CurrencyId,
-        ExchangeRate = invoice.ExchangeRate,
-        SubTotal = invoice.SubTotal,
-        DiscountAmount = invoice.DiscountAmount,
-        TaxAmount = invoice.TaxAmount,
-        TotalAmount = invoice.TotalAmount,
-        DocumentStatusId = invoice.DocumentStatusId,
-        Notes = invoice.Notes,
-        CreatedAt = invoice.CreatedAt,
-        CreatedByUserId = invoice.CreatedByUserId
-    };
-
-    return Ok(result);
-}
 }

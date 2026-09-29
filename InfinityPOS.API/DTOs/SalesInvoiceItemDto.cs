@@ -3,10 +3,13 @@ namespace InfinityPOS.API.DTOs;
 public class SalesInvoiceItemDto
 {
     public long SalesInvoiceItemId { get; set; }
-
     public long SalesInvoiceId { get; set; }
+
     public int ProductId { get; set; }
     public long? ProductPriceId { get; set; }
+
+    // Selected stock batch
+    public long? ProductStockBatchId { get; set; }
 
     public decimal Quantity { get; set; }
     public decimal UnitPrice { get; set; }
@@ -16,6 +19,7 @@ public class SalesInvoiceItemDto
     public decimal TaxAmount { get; set; }
 
     public decimal? TotalAmount { get; set; }
+
     public decimal? COGSAmount { get; set; }
     public decimal? GrossProfit { get; set; }
 }

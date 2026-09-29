@@ -7,6 +7,7 @@ public class UpdatePurchaseInvoiceItemDto
 
     public decimal Quantity { get; set; }
     public decimal UnitCost { get; set; }
+    public decimal SalePrice { get; set; }
 
     public decimal DiscountAmount { get; set; }
     public decimal TaxAmount { get; set; }

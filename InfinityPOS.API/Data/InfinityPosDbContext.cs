@@ -13,83 +13,45 @@ public partial class InfinityPosDbContext : DbContext
     }
 
     public virtual DbSet<Account> Accounts { get; set; }
-
     public virtual DbSet<AccountType> AccountTypes { get; set; }
-
     public virtual DbSet<AuditLog> AuditLogs { get; set; }
-
     public virtual DbSet<Brand> Brands { get; set; }
-
     public virtual DbSet<Category> Categories { get; set; }
-
     public virtual DbSet<Currency> Currencies { get; set; }
-
     public virtual DbSet<Customer> Customers { get; set; }
-
     public virtual DbSet<CustomerType> CustomerTypes { get; set; }
-
     public virtual DbSet<DocumentStatus> DocumentStatuses { get; set; }
-
     public virtual DbSet<Expense> Expenses { get; set; }
-
     public virtual DbSet<ExpenseItem> ExpenseItems { get; set; }
-
     public virtual DbSet<FiscalPeriod> FiscalPeriods { get; set; }
-
     public virtual DbSet<JournalEntry> JournalEntries { get; set; }
-
     public virtual DbSet<JournalEntryLine> JournalEntryLines { get; set; }
-
     public virtual DbSet<PaymentMethod> PaymentMethods { get; set; }
-
     public virtual DbSet<Permission> Permissions { get; set; }
-
     public virtual DbSet<PriceType> PriceTypes { get; set; }
-
     public virtual DbSet<Product> Products { get; set; }
-
     public virtual DbSet<ProductComponent> ProductComponents { get; set; }
-
     public virtual DbSet<ProductPrice> ProductPrices { get; set; }
-
+    public virtual DbSet<ProductStockBatch> ProductStockBatches { get; set; }
     public virtual DbSet<ProductType> ProductTypes { get; set; }
-
     public virtual DbSet<PurchaseInvoice> PurchaseInvoices { get; set; }
-
     public virtual DbSet<PurchaseInvoiceItem> PurchaseInvoiceItems { get; set; }
-
     public virtual DbSet<PurchasePayment> PurchasePayments { get; set; }
-
     public virtual DbSet<Role> Roles { get; set; }
-
     public virtual DbSet<SalesInvoice> SalesInvoices { get; set; }
-
     public virtual DbSet<SalesInvoiceItem> SalesInvoiceItems { get; set; }
-
     public virtual DbSet<SalesPayment> SalesPayments { get; set; }
-
     public virtual DbSet<StockAdjustment> StockAdjustments { get; set; }
-
     public virtual DbSet<StockAdjustmentItem> StockAdjustmentItems { get; set; }
-
     public virtual DbSet<StockAdjustmentReason> StockAdjustmentReasons { get; set; }
-
     public virtual DbSet<StockBalance> StockBalances { get; set; }
-
     public virtual DbSet<StockMovement> StockMovements { get; set; }
-
     public virtual DbSet<StockMovementType> StockMovementTypes { get; set; }
-
     public virtual DbSet<StockTransfer> StockTransfers { get; set; }
-
     public virtual DbSet<StockTransferItem> StockTransferItems { get; set; }
-
     public virtual DbSet<Supplier> Suppliers { get; set; }
-
     public virtual DbSet<Unit> Units { get; set; }
-
     public virtual DbSet<User> Users { get; set; }
-
     public virtual DbSet<Warehouse> Warehouses { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -361,30 +323,6 @@ public partial class InfinityPosDbContext : DbContext
                 .HasConstraintName("FK_JournalEntries_Period");
         });
 
-        modelBuilder.Entity<JournalEntryLine>(entity =>
-        {
-            entity.HasKey(e => e.JournalEntryLineId).HasName("PK__JournalE__38207DB87F3FED24");
-
-            entity.Property(e => e.Credit).HasColumnType("decimal(19, 4)");
-            entity.Property(e => e.Debit).HasColumnType("decimal(19, 4)");
-            entity.Property(e => e.Description).HasMaxLength(500);
-            entity.Property(e => e.ExchangeRate).HasColumnType("decimal(19, 8)");
-
-            entity.HasOne(d => d.Account).WithMany(p => p.JournalEntryLines)
-                .HasForeignKey(d => d.AccountId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_JournalEntryLines_Account");
-
-            entity.HasOne(d => d.Currency).WithMany(p => p.JournalEntryLines)
-                .HasForeignKey(d => d.CurrencyId)
-                .HasConstraintName("FK_JournalEntryLines_Currency");
-
-            entity.HasOne(d => d.JournalEntry).WithMany(p => p.JournalEntryLines)
-                .HasForeignKey(d => d.JournalEntryId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_JournalEntryLines_Journal");
-        });
-
         modelBuilder.Entity<PaymentMethod>(entity =>
         {
             entity.HasKey(e => e.PaymentMethodId).HasName("PK__PaymentM__DC31C1D38F7AE2C7");
@@ -402,12 +340,12 @@ public partial class InfinityPosDbContext : DbContext
         {
             entity.HasKey(e => e.PermissionId).HasName("PK__Permissi__EFA6FB2F2DB9D94E");
 
-            entity.HasIndex(e => e.PermissionCode, "UQ_Permissions_Code").IsUnique();
-
             entity.Property(e => e.PermissionCode)
                 .HasMaxLength(100)
                 .IsUnicode(false);
             entity.Property(e => e.PermissionName).HasMaxLength(200);
+
+            entity.HasIndex(e => e.PermissionCode, "UQ_Permissions_Code").IsUnique();
         });
 
         modelBuilder.Entity<PriceType>(entity =>
@@ -494,7 +432,8 @@ public partial class InfinityPosDbContext : DbContext
         {
             entity.HasKey(e => e.ProductPriceId).HasName("PK__ProductP__92B9436FAB7E6071");
 
-            entity.HasIndex(e => new { e.ProductId, e.PriceTypeId, e.EffectiveFrom }, "IX_ProductPrices_Product_Type_Date").IsDescending(false, false, true);
+            entity.HasIndex(e => new { e.ProductId, e.PriceTypeId, e.EffectiveFrom }, "IX_ProductPrices_Product_Type_Date")
+                .IsDescending(false, false, true);
 
             entity.Property(e => e.CreatedAt)
                 .HasPrecision(0)
@@ -506,6 +445,7 @@ public partial class InfinityPosDbContext : DbContext
 
             entity.HasOne(d => d.CreatedByUser).WithMany(p => p.ProductPrices)
                 .HasForeignKey(d => d.CreatedByUserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_ProductPrices_CreatedBy");
 
             entity.HasOne(d => d.Currency).WithMany(p => p.ProductPrices)
@@ -522,6 +462,55 @@ public partial class InfinityPosDbContext : DbContext
                 .HasForeignKey(d => d.ProductId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_ProductPrices_Product");
+        });
+
+        modelBuilder.Entity<ProductStockBatch>(entity =>
+        {
+            entity.HasKey(e => e.ProductStockBatchId)
+                .HasName("PK_ProductStockBatches");
+
+            entity.Property(e => e.CostPrice)
+                .HasColumnType("decimal(19, 4)");
+
+            entity.Property(e => e.SalePrice)
+                .HasColumnType("decimal(19, 4)");
+
+            entity.Property(e => e.OriginalQuantity)
+                .HasColumnType("decimal(19, 4)");
+
+            entity.Property(e => e.RemainingQuantity)
+                .HasColumnType("decimal(19, 4)");
+
+            entity.Property(e => e.CreatedAt)
+                .HasPrecision(0)
+                .HasDefaultValueSql("(sysdatetime())");
+
+            entity.Property(e => e.IsActive)
+                .HasDefaultValue(true);
+
+            entity.HasOne(d => d.Product)
+                .WithMany(p => p.ProductStockBatches)
+                .HasForeignKey(d => d.ProductId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ProductStockBatches_Product");
+
+            entity.HasOne(d => d.Warehouse)
+                .WithMany()
+                .HasForeignKey(d => d.WarehouseId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ProductStockBatches_Warehouse");
+
+            entity.HasOne(d => d.PurchaseInvoiceItem)
+                .WithMany(p => p.ProductStockBatches)
+                .HasForeignKey(d => d.PurchaseInvoiceItemId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ProductStockBatches_PurchaseInvoiceItem");
+
+            entity.HasOne(d => d.Currency)
+                .WithMany()
+                .HasForeignKey(d => d.CurrencyId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ProductStockBatches_Currency");
         });
 
         modelBuilder.Entity<ProductType>(entity =>
@@ -592,10 +581,15 @@ public partial class InfinityPosDbContext : DbContext
             entity.Property(e => e.DiscountAmount).HasColumnType("decimal(19, 4)");
             entity.Property(e => e.Quantity).HasColumnType("decimal(19, 4)");
             entity.Property(e => e.TaxAmount).HasColumnType("decimal(19, 4)");
+
             entity.Property(e => e.TotalAmount)
-                .HasComputedColumnSql("(([Quantity]*[UnitCost]-[DiscountAmount])+[TaxAmount])", true)
+                .HasComputedColumnSql(
+                    "(([Quantity]*[UnitCost]-[DiscountAmount])+[TaxAmount])",
+                    true)
                 .HasColumnType("decimal(38, 7)");
+
             entity.Property(e => e.UnitCost).HasColumnType("decimal(19, 4)");
+            entity.Property(e => e.SalePrice).HasColumnType("decimal(19, 4)");
 
             entity.HasOne(d => d.Product).WithMany(p => p.PurchaseInvoiceItems)
                 .HasForeignKey(d => d.ProductId)
@@ -719,17 +713,30 @@ public partial class InfinityPosDbContext : DbContext
                 .HasComputedColumnSql("([Quantity]*[UnitCost])", true)
                 .HasColumnType("decimal(38, 7)")
                 .HasColumnName("COGSAmount");
-            entity.Property(e => e.DiscountAmount).HasColumnType("decimal(19, 4)");
+
+            entity.Property(e => e.DiscountAmount)
+                .HasColumnType("decimal(19, 4)");
+
             entity.Property(e => e.GrossProfit)
-                .HasComputedColumnSql("(([Quantity]*[UnitPrice]-[DiscountAmount])-[Quantity]*[UnitCost])", true)
+                .HasComputedColumnSql(
+                    "(([Quantity]*[UnitPrice]-[DiscountAmount])-[Quantity]*[UnitCost])",
+                    true)
                 .HasColumnType("decimal(38, 7)");
-            entity.Property(e => e.Quantity).HasColumnType("decimal(19, 4)");
-            entity.Property(e => e.TaxAmount).HasColumnType("decimal(19, 4)");
+
+            entity.Property(e => e.Quantity)
+                .HasColumnType("decimal(19, 4)");
+
+            entity.Property(e => e.TaxAmount)
+                .HasColumnType("decimal(19, 4)");
+
             entity.Property(e => e.TotalAmount)
-                .HasComputedColumnSql("(([Quantity]*[UnitPrice]-[DiscountAmount])+[TaxAmount])", true)
+                .HasComputedColumnSql(
+                    "(([Quantity]*[UnitPrice]-[DiscountAmount])+[TaxAmount])",
+                    true)
                 .HasColumnType("decimal(38, 7)");
-            entity.Property(e => e.UnitCost).HasColumnType("decimal(19, 4)");
-            entity.Property(e => e.UnitPrice).HasColumnType("decimal(19, 4)");
+
+            entity.Property(e => e.UnitCost)
+                .HasColumnType("decimal(19, 4)");
 
             entity.HasOne(d => d.Product).WithMany(p => p.SalesInvoiceItems)
                 .HasForeignKey(d => d.ProductId)
@@ -739,6 +746,11 @@ public partial class InfinityPosDbContext : DbContext
             entity.HasOne(d => d.ProductPrice).WithMany(p => p.SalesInvoiceItems)
                 .HasForeignKey(d => d.ProductPriceId)
                 .HasConstraintName("FK_SalesInvoiceItems_ProductPrice");
+
+            entity.HasOne(d => d.ProductStockBatch).WithMany()
+                .HasForeignKey(d => d.ProductStockBatchId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_SalesInvoiceItems_ProductStockBatch");
 
             entity.HasOne(d => d.SalesInvoice).WithMany(p => p.SalesInvoiceItems)
                 .HasForeignKey(d => d.SalesInvoiceId)
@@ -799,7 +811,6 @@ public partial class InfinityPosDbContext : DbContext
 
             entity.HasOne(d => d.StockAdjustmentReason).WithMany(p => p.StockAdjustments)
                 .HasForeignKey(d => d.StockAdjustmentReasonId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_StockAdjustments_Reason");
 
             entity.HasOne(d => d.Warehouse).WithMany(p => p.StockAdjustments)
@@ -846,8 +857,12 @@ public partial class InfinityPosDbContext : DbContext
 
             entity.HasIndex(e => new { e.ProductId, e.WarehouseId }, "UQ_StockBalances_Product_Warehouse").IsUnique();
 
-            entity.Property(e => e.AverageCost).HasColumnType("decimal(19, 4)");
-            entity.Property(e => e.Quantity).HasColumnType("decimal(19, 4)");
+            entity.Property(e => e.AverageCost)
+                .HasColumnType("decimal(19, 4)");
+
+            entity.Property(e => e.Quantity)
+                .HasColumnType("decimal(19, 4)");
+
             entity.Property(e => e.UpdatedAt)
                 .HasPrecision(0)
                 .HasDefaultValueSql("(sysdatetime())");
@@ -859,41 +874,57 @@ public partial class InfinityPosDbContext : DbContext
 
             entity.HasOne(d => d.Warehouse).WithMany(p => p.StockBalances)
                 .HasForeignKey(d => d.WarehouseId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_StockBalances_Warehouse");
         });
 
         modelBuilder.Entity<StockMovement>(entity =>
         {
-            entity.HasKey(e => e.StockMovementId).HasName("PK__StockMov__E963E37CE11D88A8");
+            entity.HasKey(e => e.StockMovementId)
+                .HasName("PK__StockMov__E963E37CE11D88A8");
 
-            entity.HasIndex(e => new { e.ProductId, e.WarehouseId, e.MovementDate }, "IX_StockMovements_Product_Warehouse_Date");
+            entity.HasIndex(
+                e => new { e.ProductId, e.WarehouseId, e.MovementDate },
+                "IX_StockMovements_Product_Warehouse_Date");
 
             entity.Property(e => e.MovementDate)
                 .HasPrecision(0)
                 .HasDefaultValueSql("(sysdatetime())");
-            entity.Property(e => e.Notes).HasMaxLength(500);
-            entity.Property(e => e.Quantity).HasColumnType("decimal(19, 4)");
+
+            entity.Property(e => e.Notes)
+                .HasMaxLength(500);
+
+            entity.Property(e => e.Quantity)
+                .HasColumnType("decimal(19, 4)");
+
             entity.Property(e => e.ReferenceType)
                 .HasMaxLength(50)
                 .IsUnicode(false);
-            entity.Property(e => e.UnitCost).HasColumnType("decimal(19, 4)");
 
-            entity.HasOne(d => d.CreatedByUser).WithMany(p => p.StockMovements)
+            entity.Property(e => e.UnitCost)
+                .HasColumnType("decimal(19, 4)");
+
+            entity.HasOne(d => d.CreatedByUser)
+                .WithMany(p => p.StockMovements)
                 .HasForeignKey(d => d.CreatedByUserId)
                 .HasConstraintName("FK_StockMovements_CreatedBy");
 
-            entity.HasOne(d => d.Product).WithMany(p => p.StockMovements)
+            entity.HasOne(d => d.Product)
+                .WithMany(p => p.StockMovements)
                 .HasForeignKey(d => d.ProductId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_StockMovements_Product");
 
-            entity.HasOne(d => d.StockMovementType).WithMany(p => p.StockMovements)
+            entity.HasOne(d => d.StockMovementType)
+                .WithMany(p => p.StockMovements)
                 .HasForeignKey(d => d.StockMovementTypeId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_StockMovements_Type");
 
-            entity.HasOne(d => d.Warehouse).WithMany(p => p.StockMovements)
+            // FIX:
+            // Warehouse.StockMovements ကို explicit inverse navigation အဖြစ်သတ်မှတ်ထားသည်။
+            // ဒါကြောင့် EF Core က WarehouseId1 shadow FK မဖန်တီးတော့ပါ။
+            entity.HasOne(d => d.Warehouse)
+                .WithMany(p => p.StockMovements)
                 .HasForeignKey(d => d.WarehouseId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_StockMovements_Warehouse");
@@ -909,10 +940,13 @@ public partial class InfinityPosDbContext : DbContext
                 .HasMaxLength(3)
                 .IsUnicode(false)
                 .IsFixedLength();
+
             entity.Property(e => e.MovementCode)
                 .HasMaxLength(50)
                 .IsUnicode(false);
-            entity.Property(e => e.MovementName).HasMaxLength(150);
+
+            entity.Property(e => e.MovementName)
+                .HasMaxLength(150);
         });
 
         modelBuilder.Entity<StockTransfer>(entity =>
@@ -956,8 +990,11 @@ public partial class InfinityPosDbContext : DbContext
         {
             entity.HasKey(e => e.StockTransferItemId).HasName("PK__StockTra__99BA6C1E79F2EDD7");
 
-            entity.Property(e => e.Quantity).HasColumnType("decimal(19, 4)");
-            entity.Property(e => e.UnitCost).HasColumnType("decimal(19, 4)");
+            entity.Property(e => e.Quantity)
+                .HasColumnType("decimal(19, 4)");
+
+            entity.Property(e => e.UnitCost)
+                .HasColumnType("decimal(19, 4)");
 
             entity.HasOne(d => d.Product).WithMany(p => p.StockTransferItems)
                 .HasForeignKey(d => d.ProductId)
@@ -966,7 +1003,6 @@ public partial class InfinityPosDbContext : DbContext
 
             entity.HasOne(d => d.StockTransfer).WithMany(p => p.StockTransferItems)
                 .HasForeignKey(d => d.StockTransferId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_StockTransferItems_Transfer");
         });
 
@@ -1000,10 +1036,13 @@ public partial class InfinityPosDbContext : DbContext
             entity.HasIndex(e => e.UnitCode, "UQ_Units_Code").IsUnique();
 
             entity.Property(e => e.IsActive).HasDefaultValue(true);
+
             entity.Property(e => e.UnitCode)
                 .HasMaxLength(30)
                 .IsUnicode(false);
-            entity.Property(e => e.UnitName).HasMaxLength(100);
+
+            entity.Property(e => e.UnitName)
+                .HasMaxLength(100);
         });
 
         modelBuilder.Entity<User>(entity =>
@@ -1031,19 +1070,28 @@ public partial class InfinityPosDbContext : DbContext
 
         modelBuilder.Entity<Warehouse>(entity =>
         {
-            entity.HasKey(e => e.WarehouseId).HasName("PK__Warehous__2608AFF9D38D7326");
+            entity.HasKey(e => e.WarehouseId)
+                .HasName("PK__Warehous__2608AFF9D38D7326");
 
-            entity.HasIndex(e => e.WarehouseCode, "UQ_Warehouses_Code").IsUnique();
+            entity.HasIndex(e => e.WarehouseCode, "UQ_Warehouses_Code")
+                .IsUnique();
 
-            entity.Property(e => e.Address).HasMaxLength(500);
+            entity.Property(e => e.Address)
+                .HasMaxLength(500);
+
             entity.Property(e => e.CreatedAt)
                 .HasPrecision(0)
                 .HasDefaultValueSql("(sysdatetime())");
-            entity.Property(e => e.IsActive).HasDefaultValue(true);
+
+            entity.Property(e => e.IsActive)
+                .HasDefaultValue(true);
+
             entity.Property(e => e.WarehouseCode)
                 .HasMaxLength(50)
                 .IsUnicode(false);
-            entity.Property(e => e.WarehouseName).HasMaxLength(200);
+
+            entity.Property(e => e.WarehouseName)
+                .HasMaxLength(200);
         });
 
         OnModelCreatingPartial(modelBuilder);

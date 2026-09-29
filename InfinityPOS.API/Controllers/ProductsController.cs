@@ -1,9 +1,9 @@
 using InfinityPOS.API.Data;
 using InfinityPOS.API.Data.Models;
 using InfinityPOS.API.DTOs;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Authorization;
 
 namespace InfinityPOS.API.Controllers;
 
@@ -19,13 +19,23 @@ public class ProductsController : ControllerBase
         _db = db;
     }
 
-    // GET: api/products
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<ProductDto>>> GetProducts()
+    public async Task<ActionResult<IEnumerable<ProductDto>>> GetProducts(
+        [FromQuery] bool? isActive = null)
     {
-        var products = await _db.Products
+        var query = _db.Products
             .AsNoTracking()
-            .Where(p => p.IsActive)
+            .AsQueryable();
+
+        if (isActive.HasValue)
+        {
+            query = query.Where(
+                p => p.IsActive == isActive.Value
+            );
+        }
+
+        var products = await query
+            .OrderBy(p => p.ProductName)
             .Select(p => new ProductDto
             {
                 ProductId = p.ProductId,
@@ -46,9 +56,9 @@ public class ProductsController : ControllerBase
         return Ok(products);
     }
 
-    // GET: api/products/1
     [HttpGet("{id}")]
-    public async Task<ActionResult<ProductDto>> GetProduct(int id)
+    public async Task<ActionResult<ProductDto>> GetProduct(
+        int id)
     {
         var product = await _db.Products
             .AsNoTracking()
@@ -78,9 +88,9 @@ public class ProductsController : ControllerBase
         return Ok(product);
     }
 
-    // POST: api/products
     [HttpPost]
-    public async Task<ActionResult<ProductDto>> CreateProduct(CreateProductDto dto)
+    public async Task<ActionResult<ProductDto>> CreateProduct(
+        CreateProductDto dto)
     {
         var product = new Product
         {
@@ -125,15 +135,15 @@ public class ProductsController : ControllerBase
         );
     }
 
-
-    // PUT: api/products/1
     [HttpPut("{id}")]
     public async Task<ActionResult<ProductDto>> UpdateProduct(
         int id,
         UpdateProductDto dto)
     {
         var product = await _db.Products
-            .FirstOrDefaultAsync(p => p.ProductId == id);
+            .FirstOrDefaultAsync(
+                p => p.ProductId == id
+            );
 
         if (product == null)
         {
@@ -149,7 +159,8 @@ public class ProductsController : ControllerBase
         product.UnitId = dto.UnitId;
         product.Description = dto.Description;
         product.TrackInventory = dto.TrackInventory;
-        product.AllowNegativeStock = dto.AllowNegativeStock;
+        product.AllowNegativeStock =
+            dto.AllowNegativeStock;
         product.IsActive = dto.IsActive;
         product.UpdatedAt = DateTime.Now;
 
@@ -167,20 +178,22 @@ public class ProductsController : ControllerBase
             UnitId = product.UnitId,
             Description = product.Description,
             TrackInventory = product.TrackInventory,
-            AllowNegativeStock = product.AllowNegativeStock,
+            AllowNegativeStock =
+                product.AllowNegativeStock,
             IsActive = product.IsActive
         };
 
         return Ok(result);
     }
 
-
-    // DELETE: api/products/1
     [HttpDelete("{id}")]
-    public async Task<IActionResult> DeleteProduct(int id)
+    public async Task<IActionResult> DeleteProduct(
+        int id)
     {
         var product = await _db.Products
-            .FirstOrDefaultAsync(p => p.ProductId == id);
+            .FirstOrDefaultAsync(
+                p => p.ProductId == id
+            );
 
         if (product == null)
         {
@@ -194,5 +207,4 @@ public class ProductsController : ControllerBase
 
         return NoContent();
     }
-
 }
