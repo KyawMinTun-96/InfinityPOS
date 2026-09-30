@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import {
-  App,
   Button,
   Card,
   Col,
   DatePicker,
   Empty,
   Input,
+  InputNumber,
+  message,
   Row,
   Select,
   Space,
@@ -30,10 +31,6 @@ import { getWarehouses } from "../../api/warehousesApi";
 
 const { RangePicker } = DatePicker;
 const { Text } = Typography;
-
-/* =========================================================
-   MOVEMENT TYPES
-========================================================= */
 
 const MOVEMENT_TYPES = {
   1: {
@@ -92,14 +89,8 @@ const MOVEMENT_TYPES = {
   },
 };
 
-/* =========================================================
-   HELPERS
-========================================================= */
-
 function getValue(obj, ...keys) {
-  if (!obj) {
-    return null;
-  }
+  if (!obj) return null;
 
   for (const key of keys) {
     if (
@@ -141,15 +132,11 @@ function formatNumber(value) {
 }
 
 function formatDate(value) {
-  if (!value) {
-    return "-";
-  }
+  if (!value) return "-";
 
   const date = dayjs(value);
 
-  if (!date.isValid()) {
-    return "-";
-  }
+  if (!date.isValid()) return "-";
 
   return date.format("DD/MM/YYYY HH:mm");
 }
@@ -174,9 +161,7 @@ function getMovementType(movement) {
 }
 
 function getWarehouseShortName(name) {
-  if (!name) {
-    return "-";
-  }
+  if (!name) return "-";
 
   let value = String(name).trim();
 
@@ -192,13 +177,7 @@ function getWarehouseShortName(name) {
   return value;
 }
 
-/* =========================================================
-   COMPONENT
-========================================================= */
-
 export default function StockBalance() {
-  const { message } = App.useApp();
-
   const [loading, setLoading] = useState(false);
 
   const [balances, setBalances] = useState([]);
@@ -207,28 +186,30 @@ export default function StockBalance() {
   const [warehouses, setWarehouses] = useState([]);
 
   const [searchText, setSearchText] = useState("");
-
-  const [warehouseId, setWarehouseId] =
-    useState(null);
-
-  const [productId, setProductId] =
-    useState(null);
-
+  const [warehouseId, setWarehouseId] = useState(null);
   const [movementTypeId, setMovementTypeId] =
     useState("all");
 
-  const [dateRange, setDateRange] =
-    useState([
-      dayjs().startOf("day"),
-      dayjs().endOf("day"),
-    ]);
+  // null = ALL
+  // number = exact balance
+  // "nonZero" = balance > 0
+  const [stockBalanceFilter, setStockBalanceFilter] =
+    useState(null);
+
+  const [customStockBalance, setCustomStockBalance] =
+    useState(null);
+
+  const [dateRange, setDateRange] = useState([
+    dayjs().startOf("day"),
+    dayjs().endOf("day"),
+  ]);
 
   const [dateFilter, setDateFilter] =
     useState("today");
 
-  /* =========================================================
-     LOAD DATA
-  ========================================================= */
+  // ============================================================
+  // LOAD DATA
+  // ============================================================
 
   const loadData = useCallback(async () => {
     try {
@@ -242,7 +223,7 @@ export default function StockBalance() {
       ] = await Promise.all([
         getStockBalances(),
         getStockMovements(),
-        getProducts(true),
+        getProducts(),
         getWarehouses(true),
       ]);
 
@@ -288,7 +269,7 @@ export default function StockBalance() {
     } finally {
       setLoading(false);
     }
-  }, [message]);
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -298,9 +279,9 @@ export default function StockBalance() {
     return () => clearTimeout(timer);
   }, [loadData]);
 
-  /* =========================================================
-     PRODUCT MAP
-  ========================================================= */
+  // ============================================================
+  // PRODUCT MAP
+  // ============================================================
 
   const productMap = useMemo(() => {
     const map = {};
@@ -322,9 +303,9 @@ export default function StockBalance() {
     return map;
   }, [products]);
 
-  /* =========================================================
-     WAREHOUSE MAP
-  ========================================================= */
+  // ============================================================
+  // WAREHOUSE MAP
+  // ============================================================
 
   const warehouseMap = useMemo(() => {
     const map = {};
@@ -346,9 +327,9 @@ export default function StockBalance() {
     return map;
   }, [warehouses]);
 
-  /* =========================================================
-     PRODUCT HELPERS
-  ========================================================= */
+  // ============================================================
+  // HELPERS
+  // ============================================================
 
   const getProductName = useCallback(
     (id) => {
@@ -362,8 +343,7 @@ export default function StockBalance() {
           "ProductName",
           "name",
           "Name"
-        ) ||
-        `Product #${id}`
+        ) || `Product #${id}`
       );
     },
     [productMap]
@@ -383,8 +363,7 @@ export default function StockBalance() {
           "ProductCode",
           "code",
           "Code"
-        ) ||
-        `P-${id}`
+        ) || `P-${id}`
       );
     },
     [productMap]
@@ -402,16 +381,15 @@ export default function StockBalance() {
           "WarehouseName",
           "name",
           "Name"
-        ) ||
-        `WH #${id}`
+        ) || `WH #${id}`
       );
     },
     [warehouseMap]
   );
 
-  /* =========================================================
-     DATE FILTER
-  ========================================================= */
+  // ============================================================
+  // DATE FILTER
+  // ============================================================
 
   const handleDateFilterChange = (value) => {
     setDateFilter(value);
@@ -437,6 +415,7 @@ export default function StockBalance() {
         date.startOf("day"),
         date.endOf("day"),
       ]);
+
       return;
     }
 
@@ -471,420 +450,715 @@ export default function StockBalance() {
     setDateFilter("custom");
   };
 
-  /* =========================================================
-     BATCH STOCK SUMMARY
-  ========================================================= */
+  // ============================================================
+  // STOCK SUMMARY
+  // ============================================================
 
   const stockSummary = useMemo(() => {
-    return balances
-      .filter((balance) => {
-        const remaining =
-          safeNumber(
-            getValue(
-              balance,
-              "remainingQuantity",
-              "RemainingQuantity"
-            )
-          );
+    const grouped = {};
 
-        return remaining > 0;
-      })
-      .map((balance) => ({
-        productStockBatchId:
-          safeNumber(
-            getValue(
-              balance,
-              "productStockBatchId",
-              "ProductStockBatchId"
-            )
-          ),
+    balances.forEach((balance) => {
+      const productId = safeNumber(
+        getValue(
+          balance,
+          "productId",
+          "ProductId"
+        )
+      );
 
-        productId:
+      const warehouseId = safeNumber(
+        getValue(
+          balance,
+          "warehouseId",
+          "WarehouseId"
+        )
+      );
+
+      if (productId <= 0) {
+        return;
+      }
+
+      const key =
+        `${productId}_${warehouseId}`;
+
+      if (!grouped[key]) {
+        grouped[key] = [];
+      }
+
+      grouped[key].push(balance);
+    });
+
+    const result = [];
+
+    // ----------------------------------------------------------
+    // Existing stock
+    // ----------------------------------------------------------
+
+    Object.values(grouped).forEach(
+      (batchList) => {
+        if (!batchList.length) {
+          return;
+        }
+
+        const firstBatch =
+          batchList[0];
+
+        const productId =
           safeNumber(
             getValue(
-              balance,
+              firstBatch,
               "productId",
               "ProductId"
             )
-          ),
+          );
 
-        warehouseId:
+        const warehouseId =
           safeNumber(
             getValue(
-              balance,
+              firstBatch,
               "warehouseId",
               "WarehouseId"
             )
-          ),
-
-        purchaseInvoiceItemId:
-          safeNumber(
-            getValue(
-              balance,
-              "purchaseInvoiceItemId",
-              "PurchaseInvoiceItemId"
-            )
-          ),
-
-        costPrice:
-          safeNumber(
-            getValue(
-              balance,
-              "costPrice",
-              "CostPrice"
-            )
-          ),
-
-        salePrice:
-          safeNumber(
-            getValue(
-              balance,
-              "salePrice",
-              "SalePrice"
-            )
-          ),
-
-        originalQuantity:
-          safeNumber(
-            getValue(
-              balance,
-              "originalQuantity",
-              "OriginalQuantity"
-            )
-          ),
-
-        remainingQuantity:
-          safeNumber(
-            getValue(
-              balance,
-              "remainingQuantity",
-              "RemainingQuantity"
-            )
-          ),
-
-        currencyId:
-          safeNumber(
-            getValue(
-              balance,
-              "currencyId",
-              "CurrencyId"
-            )
-          ),
-
-        createdAt:
-          getValue(
-            balance,
-            "createdAt",
-            "CreatedAt"
-          ),
-      }));
-  }, [balances]);
-
-  /* =========================================================
-     FILTERED STOCK
-  ========================================================= */
-
-  const filteredStockSummary = useMemo(() => {
-    const search =
-      searchText.trim().toLowerCase();
-
-    return stockSummary.filter((row) => {
-      if (
-        warehouseId !== null &&
-        row.warehouseId !==
-          safeNumber(warehouseId)
-      ) {
-        return false;
-      }
-
-      if (
-        productId !== null &&
-        row.productId !==
-          safeNumber(productId)
-      ) {
-        return false;
-      }
-
-      if (search) {
-        const code =
-          getProductCode(
-            row.productId
-          ).toLowerCase();
-
-        const name =
-          getProductName(
-            row.productId
-          ).toLowerCase();
-
-        const warehouse =
-          getWarehouseName(
-            row.warehouseId
-          ).toLowerCase();
-
-        const cost =
-          String(row.costPrice);
-
-        const sale =
-          String(row.salePrice);
-
-        const matched =
-          code.includes(search) ||
-          name.includes(search) ||
-          warehouse.includes(search) ||
-          cost.includes(search) ||
-          sale.includes(search);
-
-        if (!matched) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-  }, [
-    stockSummary,
-    warehouseId,
-    productId,
-    searchText,
-    getProductCode,
-    getProductName,
-    getWarehouseName,
-  ]);
-
-  /* =========================================================
-     FILTERED MOVEMENTS
-  ========================================================= */
-
-  const filteredMovements = useMemo(() => {
-    const search =
-      searchText.trim().toLowerCase();
-
-    return movements.filter((movement) => {
-      const movementProductId =
-        safeNumber(
-          getValue(
-            movement,
-            "productId",
-            "ProductId"
-          )
-        );
-
-      const movementWarehouseId =
-        safeNumber(
-          getValue(
-            movement,
-            "warehouseId",
-            "WarehouseId"
-          )
-        );
-
-      const typeId =
-        safeNumber(
-          getValue(
-            movement,
-            "stockMovementTypeId",
-            "StockMovementTypeId"
-          )
-        );
-
-      const movementDate =
-        getValue(
-          movement,
-          "movementDate",
-          "MovementDate",
-          "createdAt",
-          "CreatedAt",
-          "date",
-          "Date"
-        );
-
-      if (dateRange && movementDate) {
-        const date = dayjs(
-          movementDate
-        );
-
-        if (
-          date.isBefore(
-            dateRange[0]
-          ) ||
-          date.isAfter(
-            dateRange[1]
-          )
-        ) {
-          return false;
-        }
-      }
-
-      if (
-        warehouseId !== null &&
-        movementWarehouseId !==
-          safeNumber(warehouseId)
-      ) {
-        return false;
-      }
-
-      if (
-        productId !== null &&
-        movementProductId !==
-          safeNumber(productId)
-      ) {
-        return false;
-      }
-
-      if (
-        movementTypeId !== "all" &&
-        typeId !==
-          safeNumber(movementTypeId)
-      ) {
-        return false;
-      }
-
-      if (search) {
-        const text = [
-          getProductCode(
-            movementProductId
-          ),
-          getProductName(
-            movementProductId
-          ),
-          getWarehouseName(
-            movementWarehouseId
-          ),
-          getMovementType(
-            movement
-          ).name,
-          getValue(
-            movement,
-            "referenceNo",
-            "ReferenceNo",
-            "reference",
-            "Reference"
-          ),
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
-
-        if (!text.includes(search)) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-  }, [
-    movements,
-    dateRange,
-    warehouseId,
-    productId,
-    movementTypeId,
-    searchText,
-    getProductCode,
-    getProductName,
-    getWarehouseName,
-  ]);
-
-  /* =========================================================
-     BATCH TABLE DATA
-========================================================= */
-
-  const stockTableData = useMemo(() => {
-    return filteredStockSummary.map(
-      (row, index) => {
-        /*
-          IMPORTANT
-
-          This table is batch based.
-
-          IN      = Original Quantity
-          OUT     = Original - Remaining
-          ADJUST  = 0
-          RETURN  = 0
-          BALANCE = Remaining Quantity
-
-          Later Sales / Adjustment / Return
-          posting can update these movement
-          values from StockMovements.
-        */
-
-        const original =
-          safeNumber(
-            row.originalQuantity
           );
 
-        const remaining =
-          safeNumber(
-            row.remainingQuantity
+        const originalQuantity =
+          batchList.reduce(
+            (total, batch) =>
+              total +
+              safeNumber(
+                getValue(
+                  batch,
+                  "originalQuantity",
+                  "OriginalQuantity"
+                )
+              ),
+            0
           );
 
-        const sold =
-          Math.max(
-            0,
-            original - remaining
+        const remainingQuantity =
+          batchList.reduce(
+            (total, batch) =>
+              total +
+              safeNumber(
+                getValue(
+                  batch,
+                  "remainingQuantity",
+                  "RemainingQuantity"
+                )
+              ),
+            0
           );
 
-        return {
-          key:
-            row.productStockBatchId ||
-            `${row.productId}-${row.warehouseId}-${index}`,
+        const latestBatch =
+          [...batchList].sort(
+            (a, b) =>
+              new Date(
+                getValue(
+                  b,
+                  "createdAt",
+                  "CreatedAt"
+                ) || 0
+              ) -
+              new Date(
+                getValue(
+                  a,
+                  "createdAt",
+                  "CreatedAt"
+                ) || 0
+              )
+          )[0];
 
-          index: index + 1,
-
-          code: getProductCode(
-            row.productId
-          ),
-
-          name: getProductName(
-            row.productId
-          ),
-
-          warehouse:
-            getWarehouseShortName(
-              getWarehouseName(
-                row.warehouseId
+        result.push({
+          productStockBatchId:
+            safeNumber(
+              getValue(
+                latestBatch,
+                "productStockBatchId",
+                "ProductStockBatchId"
               )
             ),
 
-          productId:
-            row.productId,
+          productId,
 
-          warehouseId:
-            row.warehouseId,
+          warehouseId,
 
-          productStockBatchId:
-            row.productStockBatchId,
-
-          inQty: original,
-
-          outQty: sold,
-
-          adjustQty: 0,
-
-          returnQty: 0,
-
-          balance: remaining,
+          purchaseInvoiceItemId:
+            safeNumber(
+              getValue(
+                latestBatch,
+                "purchaseInvoiceItemId",
+                "PurchaseInvoiceItemId"
+              )
+            ),
 
           costPrice:
-            row.costPrice,
+            safeNumber(
+              getValue(
+                latestBatch,
+                "costPrice",
+                "CostPrice"
+              )
+            ),
 
           salePrice:
-            row.salePrice,
+            safeNumber(
+              getValue(
+                latestBatch,
+                "salePrice",
+                "SalePrice"
+              )
+            ),
+
+          originalQuantity,
+
+          remainingQuantity,
+
+          currencyId:
+            safeNumber(
+              getValue(
+                latestBatch,
+                "currencyId",
+                "CurrencyId"
+              )
+            ),
 
           createdAt:
-            row.createdAt,
-        };
+            getValue(
+              latestBatch,
+              "createdAt",
+              "CreatedAt"
+            ),
+        });
       }
     );
-  }, [
-    filteredStockSummary,
-    getProductCode,
-    getProductName,
-    getWarehouseName,
-  ]);
 
-  /* =========================================================
-     TOTALS
-  ========================================================= */
+    // ----------------------------------------------------------
+    // Products with NO stock
+    // ----------------------------------------------------------
+
+    products.forEach((product) => {
+      const id = safeNumber(
+        getValue(
+          product,
+          "productId",
+          "ProductId"
+        )
+      );
+
+      if (id <= 0) {
+        return;
+      }
+
+      const alreadyExists =
+        result.some(
+          (row) =>
+            row.productId === id
+        );
+
+      if (alreadyExists) {
+        return;
+      }
+
+      result.push({
+        productStockBatchId: 0,
+        productId: id,
+        warehouseId: 0,
+        purchaseInvoiceItemId: 0,
+        costPrice: 0,
+        salePrice: 0,
+        originalQuantity: 0,
+        remainingQuantity: 0,
+        currencyId: 0,
+        createdAt: getValue(
+          product,
+          "createdAt",
+          "CreatedAt"
+        ),
+      });
+    });
+
+    return result.sort((a, b) => {
+      if (
+        a.productId !==
+        b.productId
+      ) {
+        return (
+          a.productId -
+          b.productId
+        );
+      }
+
+      return (
+        a.warehouseId -
+        b.warehouseId
+      );
+    });
+  }, [balances, products]);
+
+  // ============================================================
+  // STOCK BALANCE OPTIONS
+  // ============================================================
+
+  const stockBalanceOptions =
+    useMemo(() => {
+      const uniqueValues =
+        new Set();
+
+      stockSummary.forEach(
+        (row) => {
+          uniqueValues.add(
+            safeNumber(
+              row.remainingQuantity
+            )
+          );
+        }
+      );
+
+      return Array.from(
+        uniqueValues
+      )
+        .sort((a, b) => a - b)
+        .map((value) => ({
+          value,
+          label:
+            formatNumber(value),
+        }));
+    }, [stockSummary]);
+
+  // ============================================================
+  // STOCK BALANCE FILTER
+  // ============================================================
+
+  const handleStockBalanceChange = (
+    value
+  ) => {
+    if (
+      value === "all" ||
+      value === undefined ||
+      value === null ||
+      value === ""
+    ) {
+      setStockBalanceFilter(null);
+      return;
+    }
+
+    if (value === "nonZero") {
+      setStockBalanceFilter(
+        "nonZero"
+      );
+      return;
+    }
+
+    const numberValue =
+      Number(value);
+
+    if (
+      !Number.isFinite(
+        numberValue
+      )
+    ) {
+      setStockBalanceFilter(null);
+      return;
+    }
+
+    setStockBalanceFilter(
+      numberValue
+    );
+  };
+
+  // ============================================================
+  // CUSTOM BALANCE
+  // ============================================================
+
+  const handleApplyCustomStockBalance = () => {
+    if (
+      customStockBalance === null ||
+      customStockBalance === undefined ||
+      customStockBalance === ""
+    ) {
+      message.warning(
+        "Please enter a stock balance."
+      );
+      return;
+    }
+
+    const value = Number(
+      customStockBalance
+    );
+
+    if (!Number.isFinite(value)) {
+      message.warning(
+        "Please enter a valid number."
+      );
+      return;
+    }
+
+    setStockBalanceFilter(
+      value
+    );
+
+    message.success(
+      `Stock balance filter set to ${formatNumber(
+        value
+      )}`
+    );
+  };
+
+  // ============================================================
+  // FILTERED STOCK
+  // ============================================================
+
+  const filteredStockSummary =
+    useMemo(() => {
+      const search =
+        searchText
+          .trim()
+          .toLowerCase();
+
+      return stockSummary.filter(
+        (row) => {
+          // Warehouse
+          if (
+            warehouseId !==
+              null &&
+            row.warehouseId !==
+              safeNumber(
+                warehouseId
+              )
+          ) {
+            return false;
+          }
+
+          // Stock Balance
+          if (
+            stockBalanceFilter ===
+            "nonZero"
+          ) {
+            if (
+              safeNumber(
+                row.remainingQuantity
+              ) <= 0
+            ) {
+              return false;
+            }
+          } else if (
+            stockBalanceFilter !==
+            null
+          ) {
+            if (
+              safeNumber(
+                row.remainingQuantity
+              ) !==
+              safeNumber(
+                stockBalanceFilter
+              )
+            ) {
+              return false;
+            }
+          }
+
+          // Search
+          if (search) {
+            const code =
+              getProductCode(
+                row.productId
+              ).toLowerCase();
+
+            const name =
+              getProductName(
+                row.productId
+              ).toLowerCase();
+
+            const warehouse =
+              getWarehouseName(
+                row.warehouseId
+              ).toLowerCase();
+
+            const cost = String(
+              row.costPrice
+            );
+
+            const sale = String(
+              row.salePrice
+            );
+
+            const balance =
+              String(
+                row.remainingQuantity
+              );
+
+            const matched =
+              code.includes(
+                search
+              ) ||
+              name.includes(
+                search
+              ) ||
+              warehouse.includes(
+                search
+              ) ||
+              cost.includes(
+                search
+              ) ||
+              sale.includes(
+                search
+              ) ||
+              balance.includes(
+                search
+              );
+
+            if (!matched) {
+              return false;
+            }
+          }
+
+          return true;
+        }
+      );
+    }, [
+      stockSummary,
+      warehouseId,
+      stockBalanceFilter,
+      searchText,
+      getProductCode,
+      getProductName,
+      getWarehouseName,
+    ]);
+
+  // ============================================================
+  // FILTERED MOVEMENTS
+  // ============================================================
+
+  const filteredMovements =
+    useMemo(() => {
+      const search =
+        searchText
+          .trim()
+          .toLowerCase();
+
+      return movements.filter(
+        (movement) => {
+          const movementProductId =
+            safeNumber(
+              getValue(
+                movement,
+                "productId",
+                "ProductId"
+              )
+            );
+
+          const movementWarehouseId =
+            safeNumber(
+              getValue(
+                movement,
+                "warehouseId",
+                "WarehouseId"
+              )
+            );
+
+          const typeId =
+            safeNumber(
+              getValue(
+                movement,
+                "stockMovementTypeId",
+                "StockMovementTypeId"
+              )
+            );
+
+          const movementDate =
+            getValue(
+              movement,
+              "movementDate",
+              "MovementDate",
+              "createdAt",
+              "CreatedAt",
+              "date",
+              "Date"
+            );
+
+          if (
+            dateRange &&
+            movementDate
+          ) {
+            const date =
+              dayjs(movementDate);
+
+            if (
+              date.isBefore(
+                dateRange[0]
+              ) ||
+              date.isAfter(
+                dateRange[1]
+              )
+            ) {
+              return false;
+            }
+          }
+
+          if (
+            warehouseId !==
+              null &&
+            movementWarehouseId !==
+              safeNumber(
+                warehouseId
+              )
+          ) {
+            return false;
+          }
+
+          if (
+            movementTypeId !==
+              "all" &&
+            typeId !==
+              safeNumber(
+                movementTypeId
+              )
+          ) {
+            return false;
+          }
+
+          if (search) {
+            const text = [
+              getProductCode(
+                movementProductId
+              ),
+
+              getProductName(
+                movementProductId
+              ),
+
+              getWarehouseName(
+                movementWarehouseId
+              ),
+
+              getMovementType(
+                movement
+              ).name,
+
+              getValue(
+                movement,
+                "referenceNo",
+                "ReferenceNo",
+                "reference",
+                "Reference"
+              ),
+            ]
+              .filter(Boolean)
+              .join(" ")
+              .toLowerCase();
+
+            if (
+              !text.includes(search)
+            ) {
+              return false;
+            }
+          }
+
+          return true;
+        }
+      );
+    }, [
+      movements,
+      dateRange,
+      warehouseId,
+      movementTypeId,
+      searchText,
+      getProductCode,
+      getProductName,
+      getWarehouseName,
+    ]);
+
+  // ============================================================
+  // STOCK TABLE DATA
+  // ============================================================
+
+  const stockTableData =
+    useMemo(() => {
+      return filteredStockSummary.map(
+        (row, index) => {
+          const original =
+            safeNumber(
+              row.originalQuantity
+            );
+
+          const remaining =
+            safeNumber(
+              row.remainingQuantity
+            );
+
+          const sold =
+            Math.max(
+              0,
+              original -
+                remaining
+            );
+
+          return {
+            key:
+              row.productStockBatchId ||
+              `product-${row.productId}-${row.warehouseId}-${index}`,
+
+            index: index + 1,
+
+            code:
+              getProductCode(
+                row.productId
+              ),
+
+            name:
+              getProductName(
+                row.productId
+              ),
+
+            warehouse:
+              row.warehouseId > 0
+                ? getWarehouseShortName(
+                    getWarehouseName(
+                      row.warehouseId
+                    )
+                  )
+                : "-",
+
+            productId:
+              row.productId,
+
+            warehouseId:
+              row.warehouseId,
+
+            productStockBatchId:
+              row.productStockBatchId,
+
+            inQty: original,
+
+            outQty: sold,
+
+            adjustQty: 0,
+
+            returnQty: 0,
+
+            balance: remaining,
+
+            costPrice:
+              row.costPrice,
+
+            salePrice:
+              row.salePrice,
+
+            createdAt:
+              row.createdAt,
+          };
+        }
+      );
+    }, [
+      filteredStockSummary,
+      getProductCode,
+      getProductName,
+      getWarehouseName,
+    ]);
+
+  // ============================================================
+  // STATISTICS
+  // ============================================================
 
   const currentStock =
     filteredStockSummary.reduce(
@@ -905,7 +1179,8 @@ export default function StockBalance() {
           );
 
         if (
-          type.direction !== "IN"
+          type.direction !==
+          "IN"
         ) {
           return total;
         }
@@ -935,7 +1210,8 @@ export default function StockBalance() {
           );
 
         if (
-          type.direction !== "OUT"
+          type.direction !==
+          "OUT"
         ) {
           return total;
         }
@@ -956,9 +1232,9 @@ export default function StockBalance() {
       0
     );
 
-  /* =========================================================
-     MOVEMENT TABLE DATA
-  ========================================================= */
+  // ============================================================
+  // MOVEMENT TABLE
+  // ============================================================
 
   const movementTableData =
     useMemo(() => {
@@ -1058,91 +1334,50 @@ export default function StockBalance() {
       getWarehouseName,
     ]);
 
-  /* =========================================================
-     OPTIONS
-  ========================================================= */
+  // ============================================================
+  // OPTIONS
+  // ============================================================
 
   const warehouseOptions =
-    useMemo(() => {
-      return warehouses.map(
-        (warehouse) => {
-          const id =
-            safeNumber(
+    useMemo(
+      () =>
+        warehouses.map(
+          (warehouse) => {
+            const id =
+              safeNumber(
+                getValue(
+                  warehouse,
+                  "warehouseId",
+                  "WarehouseId"
+                )
+              );
+
+            const name =
               getValue(
                 warehouse,
-                "warehouseId",
-                "WarehouseId"
-              )
-            );
+                "warehouseName",
+                "WarehouseName",
+                "name",
+                "Name"
+              ) ||
+              `WH #${id}`;
 
-          const name =
-            getValue(
-              warehouse,
-              "warehouseName",
-              "WarehouseName",
-              "name",
-              "Name"
-            ) ||
-            `WH #${id}`;
-
-          return {
-            value: id,
-            label: name,
-          };
-        }
-      );
-    }, [warehouses]);
-
-  const productOptions =
-    useMemo(() => {
-      return products.map(
-        (product) => {
-          const id =
-            safeNumber(
-              getValue(
-                product,
-                "productId",
-                "ProductId"
-              )
-            );
-
-          const code =
-            getValue(
-              product,
-              "sku",
-              "SKU",
-              "productCode",
-              "ProductCode",
-              "code",
-              "Code"
-            ) || "";
-
-          const name =
-            getValue(
-              product,
-              "productName",
-              "ProductName",
-              "name",
-              "Name"
-            ) ||
-            `Product #${id}`;
-
-          return {
-            value: id,
-            label: code
-              ? `${code} - ${name}`
-              : name,
-          };
-        }
-      );
-    }, [products]);
+            return {
+              value: id,
+              label: name,
+            };
+          }
+        ),
+      [warehouses]
+    );
 
   const movementTypeOptions =
-    useMemo(() => {
-      return [
+    useMemo(
+      () => [
         {
           value: "all",
-          label: "All Movement Types",
+          label:
+            "All Movement Types",
         },
 
         ...Object.entries(
@@ -1153,12 +1388,13 @@ export default function StockBalance() {
             label: type.name,
           })
         ),
-      ];
-    }, []);
+      ],
+      []
+    );
 
-  /* =========================================================
-     STOCK COLUMNS
-  ========================================================= */
+  // ============================================================
+  // STOCK COLUMNS
+  // ============================================================
 
   const stockColumns = [
     {
@@ -1199,7 +1435,6 @@ export default function StockBalance() {
       key: "inQty",
       width: 80,
       align: "right",
-
       render: (value) =>
         formatNumber(value),
     },
@@ -1210,7 +1445,6 @@ export default function StockBalance() {
       key: "outQty",
       width: 80,
       align: "right",
-
       render: (value) =>
         formatNumber(value),
     },
@@ -1221,7 +1455,6 @@ export default function StockBalance() {
       key: "adjustQty",
       width: 90,
       align: "right",
-
       render: (value) =>
         formatNumber(value),
     },
@@ -1232,7 +1465,6 @@ export default function StockBalance() {
       key: "returnQty",
       width: 90,
       align: "right",
-
       render: (value) =>
         formatNumber(value),
     },
@@ -1243,7 +1475,6 @@ export default function StockBalance() {
       key: "balance",
       width: 100,
       align: "right",
-
       render: (value) => (
         <Text strong>
           {formatNumber(value)}
@@ -1257,7 +1488,6 @@ export default function StockBalance() {
       key: "costPrice",
       width: 100,
       align: "right",
-
       render: (value) =>
         formatNumber(value),
     },
@@ -1268,7 +1498,6 @@ export default function StockBalance() {
       key: "salePrice",
       width: 100,
       align: "right",
-
       render: (value) => (
         <Text strong>
           {formatNumber(value)}
@@ -1277,9 +1506,9 @@ export default function StockBalance() {
     },
   ];
 
-  /* =========================================================
-     MOVEMENT COLUMNS
-  ========================================================= */
+  // ============================================================
+  // MOVEMENT COLUMNS
+  // ============================================================
 
   const movementColumns = [
     {
@@ -1368,9 +1597,7 @@ export default function StockBalance() {
                 fontWeight: 600,
               }}
             >
-              +{formatNumber(
-                value
-              )}
+              +{formatNumber(value)}
             </Text>
           );
         }
@@ -1382,9 +1609,7 @@ export default function StockBalance() {
               fontWeight: 600,
             }}
           >
-            −{formatNumber(
-              value
-            )}
+            −{formatNumber(value)}
           </Text>
         );
       },
@@ -1399,15 +1624,17 @@ export default function StockBalance() {
     },
   ];
 
-  /* =========================================================
-     CLEAR FILTERS
-  ========================================================= */
+  // ============================================================
+  // CLEAR
+  // ============================================================
 
   const handleClearFilters = () => {
     setSearchText("");
     setWarehouseId(null);
-    setProductId(null);
     setMovementTypeId("all");
+
+    setStockBalanceFilter(null);
+    setCustomStockBalance(null);
 
     setDateFilter("today");
 
@@ -1417,15 +1644,15 @@ export default function StockBalance() {
     ]);
   };
 
-  /* =========================================================
-     RENDER
-  ========================================================= */
+  // ============================================================
+  // RENDER
+  // ============================================================
 
   return (
     <div>
-      {/* ===================================================
+      {/* ======================================================
           HEADER
-      =================================================== */}
+          ====================================================== */}
 
       <div
         style={{
@@ -1443,12 +1670,13 @@ export default function StockBalance() {
               margin: 0,
             }}
           >
-            <DatabaseOutlined /> Stock
-            Balance
+            <DatabaseOutlined />{" "}
+            Stock Balance
           </Typography.Title>
 
           <Text type="secondary">
-            Stock balance by purchase batch
+            Current stock balance
+            by product
           </Text>
         </div>
 
@@ -1463,9 +1691,9 @@ export default function StockBalance() {
         </Button>
       </div>
 
-      {/* ===================================================
+      {/* ======================================================
           FILTERS
-      =================================================== */}
+          ====================================================== */}
 
       <Card
         size="small"
@@ -1474,6 +1702,8 @@ export default function StockBalance() {
         }}
       >
         <Row gutter={[10, 10]}>
+          {/* DATE */}
+
           <Col
             xs={24}
             sm={12}
@@ -1495,15 +1725,18 @@ export default function StockBalance() {
                 },
                 {
                   value: "yesterday",
-                  label: "Yesterday",
+                  label:
+                    "Yesterday",
                 },
                 {
                   value: "thisWeek",
-                  label: "This Week",
+                  label:
+                    "This Week",
                 },
                 {
                   value: "thisMonth",
-                  label: "This Month",
+                  label:
+                    "This Month",
                 },
                 {
                   value: "all",
@@ -1512,6 +1745,8 @@ export default function StockBalance() {
               ]}
             />
           </Col>
+
+          {/* DATE RANGE */}
 
           <Col
             xs={24}
@@ -1537,6 +1772,8 @@ export default function StockBalance() {
             />
           </Col>
 
+          {/* WAREHOUSE */}
+
           <Col
             xs={24}
             sm={12}
@@ -1559,29 +1796,118 @@ export default function StockBalance() {
             />
           </Col>
 
+          {/* STOCK BALANCE */}
+
           <Col
             xs={24}
             sm={12}
             md={6}
-            lg={5}
+            lg={4}
           >
             <Select
-              allowClear
               showSearch
-              optionFilterProp="label"
-              placeholder="Product"
+              placeholder="Stock Balance"
               style={{
                 width: "100%",
               }}
-              value={productId}
+              value={
+                stockBalanceFilter ===
+                null
+                  ? "all"
+                  : stockBalanceFilter
+              }
               onChange={
-                setProductId
+                handleStockBalanceChange
               }
-              options={
-                productOptions
+              optionFilterProp="label"
+              options={[
+                {
+                  value: "all",
+                  label:
+                    "All Stock Balance",
+                },
+
+                {
+                  value: "nonZero",
+                  label:
+                    "Non-Zero Stock",
+                },
+
+                ...stockBalanceOptions,
+              ]}
+              popupMatchSelectWidth={
+                false
               }
+              popupRender={(
+                menu
+              ) => (
+                <div
+                  style={{
+                    width: 300,
+                  }}
+                >
+                  {menu}
+
+                  <div
+                    style={{
+                      padding:
+                        "10px 12px",
+                      borderTop:
+                        "1px solid #f0f0f0",
+                      background:
+                        "#fff",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display:
+                          "flex",
+                        alignItems:
+                          "center",
+                        gap: 8,
+                        width:
+                          "100%",
+                      }}
+                    >
+                      <InputNumber
+                        style={{
+                          flex: 1,
+                          minWidth: 0,
+                          width:
+                            "100%",
+                        }}
+                        placeholder="Custom balance"
+                        value={
+                          customStockBalance
+                        }
+                        min={0}
+                        onChange={
+                          setCustomStockBalance
+                        }
+                        onPressEnter={
+                          handleApplyCustomStockBalance
+                        }
+                      />
+
+                      <Button
+                        type="primary"
+                        style={{
+                          flexShrink: 0,
+                        }}
+                        onClick={
+                          handleApplyCustomStockBalance
+                        }
+                      >
+                        Apply
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
             />
           </Col>
+
+          {/* MOVEMENT TYPE */}
 
           <Col
             xs={24}
@@ -1605,6 +1931,8 @@ export default function StockBalance() {
             />
           </Col>
 
+          {/* SEARCH */}
+
           <Col
             xs={24}
             sm={12}
@@ -1626,6 +1954,8 @@ export default function StockBalance() {
             />
           </Col>
 
+          {/* CLEAR */}
+
           <Col>
             <Button
               onClick={
@@ -1638,9 +1968,9 @@ export default function StockBalance() {
         </Row>
       </Card>
 
-      {/* ===================================================
+      {/* ======================================================
           STATISTICS
-      =================================================== */}
+          ====================================================== */}
 
       <Row
         gutter={[12, 12]}
@@ -1697,7 +2027,9 @@ export default function StockBalance() {
           <Card size="small">
             <Statistic
               title="CURRENT STOCK"
-              value={currentStock}
+              value={
+                currentStock
+              }
               precision={2}
               styles={{
                 content: {
@@ -1714,7 +2046,7 @@ export default function StockBalance() {
         >
           <Card size="small">
             <Statistic
-              title="BATCHES"
+              title="PRODUCTS"
               value={
                 filteredStockSummary.length
               }
@@ -1728,15 +2060,16 @@ export default function StockBalance() {
         </Col>
       </Row>
 
-      {/* ===================================================
+      {/* ======================================================
           CURRENT STOCK BALANCE
-      =================================================== */}
+          ====================================================== */}
 
       <Card
         size="small"
         title={
           <Space>
             <DatabaseOutlined />
+
             <span>
               Current Stock Balance
             </span>
@@ -1756,7 +2089,9 @@ export default function StockBalance() {
             size="small"
             bordered
             loading={loading}
-            columns={stockColumns}
+            columns={
+              stockColumns
+            }
             dataSource={
               stockTableData
             }
@@ -1770,24 +2105,27 @@ export default function StockBalance() {
                 200,
                 500,
               ],
-              showSizeChanger: true,
-              showTotal:
-                (total) =>
-                  `Total ${total} batches`,
+              showSizeChanger:
+                true,
+              showTotal: (
+                total
+              ) =>
+                `Total ${total} products`,
             }}
           />
         )}
       </Card>
 
-      {/* ===================================================
+      {/* ======================================================
           STOCK MOVEMENTS
-      =================================================== */}
+          ====================================================== */}
 
       <Card
         size="small"
         title={
           <Space>
             <ArrowUpOutlined />
+
             <span>
               Stock Movements
             </span>
@@ -1820,30 +2158,30 @@ export default function StockBalance() {
                 200,
                 500,
               ],
-              showSizeChanger: true,
-              showTotal:
-                (total) =>
-                  `Total ${total} movements`,
+              showSizeChanger:
+                true,
+              showTotal: (
+                total
+              ) =>
+                `Total ${total} movements`,
             }}
           />
         )}
       </Card>
 
-      {/* ===================================================
-          CSS
-      =================================================== */}
+      {/* ======================================================
+          TABLE STYLE
+          ====================================================== */}
 
       <style>
         {`
-          .ant-table-small
-            .ant-table-thead > tr > th {
+          .ant-table-small .ant-table-thead > tr > th {
             padding: 7px 8px !important;
             font-size: 12px;
             white-space: nowrap;
           }
 
-          .ant-table-small
-            .ant-table-tbody > tr > td {
+          .ant-table-small .ant-table-tbody > tr > td {
             padding: 6px 8px !important;
             font-size: 12px;
           }

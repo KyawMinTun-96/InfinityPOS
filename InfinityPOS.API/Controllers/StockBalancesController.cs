@@ -16,17 +16,20 @@ public class StockBalancesController : ControllerBase
         _context = context;
     }
 
+    // ============================================================
     // GET: api/stockbalances
-    // Stock Balance is shown by stock batch.
+    //
+    // Returns ALL active stock batches.
+    // Balance = 0 is intentionally included.
+    // ============================================================
     [HttpGet]
     public async Task<ActionResult<IEnumerable<ProductStockBatchBalanceDto>>> GetStockBalances()
     {
         var stockBalances = await _context.ProductStockBatches
             .AsNoTracking()
-            .Where(x =>
-                x.IsActive &&
-                x.RemainingQuantity > 0)
+            .Where(x => x.IsActive)
             .OrderBy(x => x.ProductId)
+            .ThenBy(x => x.WarehouseId)
             .ThenBy(x => x.CreatedAt)
             .Select(x => new ProductStockBatchBalanceDto
             {
@@ -52,8 +55,9 @@ public class StockBalancesController : ControllerBase
         return Ok(stockBalances);
     }
 
-    // GET: api/stockbalances/1
-    // Here id means ProductStockBatchId.
+    // ============================================================
+    // GET: api/stockbalances/{id}
+    // ============================================================
     [HttpGet("{id:long}")]
     public async Task<ActionResult<ProductStockBatchBalanceDto>> GetStockBalance(long id)
     {
@@ -61,8 +65,7 @@ public class StockBalancesController : ControllerBase
             .AsNoTracking()
             .Where(x =>
                 x.ProductStockBatchId == id &&
-                x.IsActive &&
-                x.RemainingQuantity > 0)
+                x.IsActive)
             .Select(x => new ProductStockBatchBalanceDto
             {
                 ProductStockBatchId = x.ProductStockBatchId,
@@ -95,14 +98,20 @@ public class StockBalancesController : ControllerBase
         return Ok(stockBalance);
     }
 
-    // GET: api/stockbalances/product/1
+    // ============================================================
+    // GET: api/stockbalances/product/{productId}
+    //
+    // Balance = 0 is included.
+    // ============================================================
     [HttpGet("product/{productId:int}")]
     public async Task<ActionResult<IEnumerable<ProductStockBatchBalanceDto>>> GetByProduct(
         int productId)
     {
         var productExists = await _context.Products
             .AsNoTracking()
-            .AnyAsync(x => x.ProductId == productId);
+            .AnyAsync(x =>
+                x.ProductId == productId &&
+                x.IsActive);
 
         if (!productExists)
         {
@@ -116,9 +125,9 @@ public class StockBalancesController : ControllerBase
             .AsNoTracking()
             .Where(x =>
                 x.ProductId == productId &&
-                x.IsActive &&
-                x.RemainingQuantity > 0)
-            .OrderBy(x => x.CreatedAt)
+                x.IsActive)
+            .OrderBy(x => x.WarehouseId)
+            .ThenBy(x => x.CreatedAt)
             .Select(x => new ProductStockBatchBalanceDto
             {
                 ProductStockBatchId = x.ProductStockBatchId,
@@ -143,7 +152,11 @@ public class StockBalancesController : ControllerBase
         return Ok(stockBalances);
     }
 
-    // GET: api/stockbalances/warehouse/1
+    // ============================================================
+    // GET: api/stockbalances/warehouse/{warehouseId}
+    //
+    // Balance = 0 is included.
+    // ============================================================
     [HttpGet("warehouse/{warehouseId:int}")]
     public async Task<ActionResult<IEnumerable<ProductStockBatchBalanceDto>>> GetByWarehouse(
         int warehouseId)
@@ -164,8 +177,7 @@ public class StockBalancesController : ControllerBase
             .AsNoTracking()
             .Where(x =>
                 x.WarehouseId == warehouseId &&
-                x.IsActive &&
-                x.RemainingQuantity > 0)
+                x.IsActive)
             .OrderBy(x => x.ProductId)
             .ThenBy(x => x.CreatedAt)
             .Select(x => new ProductStockBatchBalanceDto

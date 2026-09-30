@@ -1,10 +1,15 @@
 import { useState } from "react";
+
 import Products from "./pages/products/Products";
 import PurchaseInvoices from "./pages/purchase/PurchaseInvoices";
 import PurchaseInvoiceForm from "./pages/purchase/PurchaseInvoiceForm";
 import StockBalance from "./pages/stock/StockBalance";
+
 import SalesInvoices from "./pages/sales/SalesInvoices";
 import SalesInvoiceForm from "./pages/sales/SalesInvoiceForm";
+
+import Expenses from "./pages/expenses/Expenses";
+import ExpenseForm from "./pages/expenses/ExpenseForm";
 
 import {
   Layout,
@@ -66,6 +71,16 @@ function Dashboard({ user, onLogout }) {
     useState("list");
 
   const [editingSalesId, setEditingSalesId] =
+    useState(null);
+
+  /* =========================
+     EXPENSE STATE
+  ========================= */
+
+  const [expensePage, setExpensePage] =
+    useState("list");
+
+  const [editingExpenseId, setEditingExpenseId] =
     useState(null);
 
   /* =========================
@@ -163,6 +178,11 @@ function Dashboard({ user, onLogout }) {
       setSalesPage("list");
       setEditingSalesId(null);
     }
+
+    if (key === "expenses") {
+      setExpensePage("list");
+      setEditingExpenseId(null);
+    }
   };
 
   /* =========================
@@ -221,6 +241,32 @@ function Dashboard({ user, onLogout }) {
   function handleSalesSaved() {
     setEditingSalesId(null);
     setSalesPage("list");
+  }
+
+  /* =========================
+     EXPENSE HANDLERS
+  ========================= */
+
+  function handleNewExpense() {
+    setEditingExpenseId(null);
+    setExpensePage("form");
+  }
+
+  function handleEditExpense(
+    expenseId
+  ) {
+    setEditingExpenseId(expenseId);
+    setExpensePage("edit");
+  }
+
+  function handleExpenseCancel() {
+    setEditingExpenseId(null);
+    setExpensePage("list");
+  }
+
+  function handleExpenseSaved() {
+    setEditingExpenseId(null);
+    setExpensePage("list");
   }
 
   return (
@@ -604,12 +650,8 @@ function Dashboard({ user, onLogout }) {
             <>
               {purchasePage === "list" && (
                 <PurchaseInvoices
-                  onNewPurchase={
-                    handleNewPurchase
-                  }
-                  onEditPurchase={
-                    handleEditPurchase
-                  }
+                  onNew={handleNewPurchase}
+                  onEdit={handleEditPurchase}
                 />
               )}
 
@@ -649,6 +691,50 @@ function Dashboard({ user, onLogout }) {
           )}
 
           {/* =========================
+              EXPENSES
+          ========================= */}
+
+          {selectedMenu === "expenses" && (
+            <>
+              {expensePage === "list" && (
+                <Expenses
+                  onNew={
+                    handleNewExpense
+                  }
+                  onEdit={
+                    handleEditExpense
+                  }
+                />
+              )}
+
+              {expensePage === "form" && (
+                <ExpenseForm
+                  onCancel={
+                    handleExpenseCancel
+                  }
+                  onSaved={
+                    handleExpenseSaved
+                  }
+                />
+              )}
+
+              {expensePage === "edit" && (
+                <ExpenseForm
+                  expenseId={
+                    editingExpenseId
+                  }
+                  onCancel={
+                    handleExpenseCancel
+                  }
+                  onSaved={
+                    handleExpenseSaved
+                  }
+                />
+              )}
+            </>
+          )}
+
+          {/* =========================
               OTHER MODULES
           ========================= */}
 
@@ -656,7 +742,8 @@ function Dashboard({ user, onLogout }) {
             selectedMenu !== "sales" &&
             selectedMenu !== "products" &&
             selectedMenu !== "purchases" &&
-            selectedMenu !== "stock" && (
+            selectedMenu !== "stock" &&
+            selectedMenu !== "expenses" && (
               <Card>
                 <Title level={3}>
                   {
@@ -717,3 +804,4 @@ function App() {
 }
 
 export default App;
+

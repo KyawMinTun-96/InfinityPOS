@@ -52,6 +52,10 @@ import { getDocumentStatuses } from "../../api/documentStatusesApi";
 const { TextArea } = Input;
 const { Title, Text } = Typography;
 
+/* ============================================================
+   HELPERS
+   ============================================================ */
+
 function getValue(
   obj,
   camelCaseName,
@@ -139,6 +143,10 @@ function normalizeItem(
   };
 }
 
+/* ============================================================
+   COMPONENT
+   ============================================================ */
+
 export default function PurchaseInvoiceForm({
   purchaseInvoiceId,
   onCancel,
@@ -184,12 +192,6 @@ export default function PurchaseInvoiceForm({
     setOriginalItemIds,
   ] = useState([]);
 
-  /*
-   * Current Document Status
-   *
-   * We keep this separately because
-   * documentStatusId is not a Form.Item.
-   */
   const [
     currentDocumentStatusId,
     setCurrentDocumentStatusId,
@@ -210,9 +212,10 @@ export default function PurchaseInvoiceForm({
       form
     ) ?? 0;
 
-  /*
-   * Load all required data.
-   */
+  /* ============================================================
+     LOAD DATA
+     ============================================================ */
+
   useEffect(() => {
     let cancelled = false;
 
@@ -260,9 +263,10 @@ export default function PurchaseInvoiceForm({
           statusesData ?? []
         );
 
-        /*
-         * NEW PURCHASE
-         */
+        /* ======================================================
+           NEW PURCHASE
+           ====================================================== */
+
         if (!purchaseInvoiceId) {
           setCurrentDocumentStatusId(
             null
@@ -275,6 +279,7 @@ export default function PurchaseInvoiceForm({
           form.resetFields();
 
           form.setFieldsValue({
+            invoiceNumber: "",
             invoiceDate: dayjs(),
             exchangeRate: 1,
             discountAmount: 0,
@@ -284,9 +289,10 @@ export default function PurchaseInvoiceForm({
           return;
         }
 
-        /*
-         * EDIT PURCHASE
-         */
+        /* ======================================================
+           EDIT PURCHASE
+           ====================================================== */
+
         const invoice =
           await getPurchaseInvoice(
             purchaseInvoiceId
@@ -301,9 +307,6 @@ export default function PurchaseInvoiceForm({
           return;
         }
 
-        /*
-         * Get existing DocumentStatusId.
-         */
         const loadedStatusId =
           getValue(
             invoice,
@@ -315,9 +318,6 @@ export default function PurchaseInvoiceForm({
           loadedStatusId ?? null
         );
 
-        /*
-         * Normalize Items
-         */
         const normalizedItems =
           (
             invoiceItems ?? []
@@ -342,16 +342,17 @@ export default function PurchaseInvoiceForm({
             .filter(Boolean)
         );
 
-        /*
-         * Fill Form
-         */
+        /* ======================================================
+           FILL FORM
+           ====================================================== */
+
         form.setFieldsValue({
           invoiceNumber:
             getValue(
               invoice,
               "invoiceNumber",
               "InvoiceNumber"
-            ),
+            ) ?? "",
 
           invoiceDate:
             getValue(
@@ -457,9 +458,10 @@ export default function PurchaseInvoiceForm({
     messageApi,
   ]);
 
-  /*
-   * Product Options
-   */
+  /* ============================================================
+     OPTIONS
+     ============================================================ */
+
   const productOptions =
     useMemo(() => {
       return (
@@ -487,9 +489,6 @@ export default function PurchaseInvoiceForm({
       }));
     }, [products]);
 
-  /*
-   * Supplier Options
-   */
   const supplierOptions =
     useMemo(() => {
       return (
@@ -522,9 +521,6 @@ export default function PurchaseInvoiceForm({
       }));
     }, [suppliers]);
 
-  /*
-   * Warehouse Options
-   */
   const warehouseOptions =
     useMemo(() => {
       return (
@@ -557,9 +553,6 @@ export default function PurchaseInvoiceForm({
       }));
     }, [warehouses]);
 
-  /*
-   * Currency Options
-   */
   const currencyOptions =
     useMemo(() => {
       return (
@@ -597,9 +590,10 @@ export default function PurchaseInvoiceForm({
       }));
     }, [currencies]);
 
-  /*
-   * Draft Status
-   */
+  /* ============================================================
+     STATUS
+     ============================================================ */
+
   const draftStatus =
     useMemo(() => {
       return (
@@ -615,9 +609,6 @@ export default function PurchaseInvoiceForm({
       });
     }, [documentStatuses]);
 
-  /*
-   * Posted Status
-   */
   const postedStatus =
     useMemo(() => {
       return (
@@ -633,9 +624,10 @@ export default function PurchaseInvoiceForm({
       });
     }, [documentStatuses]);
 
-  /*
-   * Subtotal
-   */
+  /* ============================================================
+     SUBTOTAL
+     ============================================================ */
+
   const subtotal =
     useMemo(() => {
       return items.reduce(
@@ -672,9 +664,10 @@ export default function PurchaseInvoiceForm({
       );
     }, [items]);
 
-  /*
-   * Total
-   */
+  /* ============================================================
+     TOTAL
+     ============================================================ */
+
   const totalAmount =
     subtotal -
     (Number(
@@ -684,9 +677,10 @@ export default function PurchaseInvoiceForm({
       taxAmount
     ) || 0);
 
-  /*
-   * Current Status
-   */
+  /* ============================================================
+     CURRENT STATUS
+     ============================================================ */
+
   const currentStatus =
     useMemo(() => {
       if (
@@ -715,31 +709,41 @@ export default function PurchaseInvoiceForm({
       documentStatuses,
     ]);
 
-  /*
-   * Add Item
-   */
+  /* ============================================================
+     ADD ITEM
+     ============================================================ */
+
   function addItem() {
     setItems((prev) => [
       ...prev,
+
       normalizeItem(
         {
           productId:
             undefined,
+
           quantity: 1,
+
           unitCost: 0,
+
           salePrice: 0,
+
           discountAmount: 0,
+
           taxAmount: 0,
+
           totalAmount: 0,
         },
+
         prev.length
       ),
     ]);
   }
 
-  /*
-   * Remove Item
-   */
+  /* ============================================================
+     REMOVE ITEM
+     ============================================================ */
+
   function removeItem(key) {
     setItems((prev) =>
       prev.filter(
@@ -749,9 +753,10 @@ export default function PurchaseInvoiceForm({
     );
   }
 
-  /*
-   * Update Item
-   */
+  /* ============================================================
+     UPDATE ITEM
+     ============================================================ */
+
   function updateItem(
     key,
     field,
@@ -801,9 +806,10 @@ export default function PurchaseInvoiceForm({
     );
   }
 
-  /*
-   * SAVE / UPDATE
-   */
+  /* ============================================================
+     SAVE / UPDATE
+     ============================================================ */
+
   async function handleSave(
     statusId = null
   ) {
@@ -813,16 +819,13 @@ export default function PurchaseInvoiceForm({
       const values =
         await form.validateFields();
 
-      /*
-       * Determine Status
-       */
+      /* ========================================================
+         DETERMINE STATUS
+         ======================================================== */
+
       let finalStatusId =
         statusId;
 
-      /*
-       * EDIT:
-       * Use existing invoice status.
-       */
       if (
         isEditMode &&
         !finalStatusId
@@ -831,10 +834,6 @@ export default function PurchaseInvoiceForm({
           currentDocumentStatusId;
       }
 
-      /*
-       * NEW:
-       * Default to DRAFT.
-       */
       if (
         !isEditMode &&
         !finalStatusId
@@ -855,9 +854,10 @@ export default function PurchaseInvoiceForm({
         return;
       }
 
-      /*
-       * Validate Items
-       */
+      /* ========================================================
+         VALIDATE ITEMS
+         ======================================================== */
+
       if (!items.length) {
         messageApi.error(
           "Please add at least one purchase item."
@@ -927,12 +927,25 @@ export default function PurchaseInvoiceForm({
         }
       }
 
-      /*
-       * Invoice Data
-       */
+      /* ========================================================
+         INVOICE DATA
+         
+         IMPORTANT:
+         New Purchase Voucher No is generated by BACKEND.
+         Existing Voucher No is kept when updating.
+         ======================================================== */
+
       const invoiceData = {
+        /*
+         * Existing purchase keeps its Voucher No.
+         *
+         * New purchase sends empty/null value.
+         * Backend will generate PV voucher number.
+         */
         invoiceNumber:
-          values.invoiceNumber,
+          isEditMode
+            ? values.invoiceNumber
+            : null,
 
         invoiceDate:
           values.invoiceDate
@@ -989,9 +1002,10 @@ export default function PurchaseInvoiceForm({
 
       let savedInvoice;
 
-      /*
-       * UPDATE
-       */
+      /* ========================================================
+         UPDATE
+         ======================================================== */
+
       if (isEditMode) {
         savedInvoice =
           await updatePurchaseInvoice(
@@ -1000,9 +1014,10 @@ export default function PurchaseInvoiceForm({
           );
       }
 
-      /*
-       * CREATE
-       */
+      /* ========================================================
+         CREATE
+         ======================================================== */
+
       else {
         savedInvoice =
           await createPurchaseInvoice(
@@ -1010,9 +1025,10 @@ export default function PurchaseInvoiceForm({
           );
       }
 
-      /*
-       * Saved Invoice ID
-       */
+      /* ========================================================
+         SAVED INVOICE ID
+         ======================================================== */
+
       const savedInvoiceId =
         isEditMode
           ? purchaseInvoiceId
@@ -1028,9 +1044,35 @@ export default function PurchaseInvoiceForm({
         );
       }
 
-      /*
-       * Current item IDs
-       */
+      /* ========================================================
+         IMPORTANT:
+         Backend-generated Voucher No
+         
+         After CREATE, backend returns:
+         InvoiceNumber / Voucher Number
+         ======================================================== */
+
+      const generatedVoucherNo =
+        getValue(
+          savedInvoice,
+          "invoiceNumber",
+          "InvoiceNumber"
+        );
+
+      if (
+        !isEditMode &&
+        generatedVoucherNo
+      ) {
+        form.setFieldsValue({
+          invoiceNumber:
+            generatedVoucherNo,
+        });
+      }
+
+      /* ========================================================
+         CURRENT ITEM IDS
+         ======================================================== */
+
       const existingItemIds =
         items
           .map(
@@ -1039,9 +1081,10 @@ export default function PurchaseInvoiceForm({
           )
           .filter(Boolean);
 
-      /*
-       * UPDATE / CREATE ITEMS
-       */
+      /* ========================================================
+         UPDATE / CREATE ITEMS
+         ======================================================== */
+
       for (const item of items) {
         const itemData = {
           purchaseInvoiceId:
@@ -1102,9 +1145,10 @@ export default function PurchaseInvoiceForm({
         }
       }
 
-      /*
-       * DELETE REMOVED ITEMS
-       */
+      /* ========================================================
+         DELETE REMOVED ITEMS
+         ======================================================== */
+
       if (isEditMode) {
         const removedItemIds =
           originalItemIds.filter(
@@ -1124,22 +1168,26 @@ export default function PurchaseInvoiceForm({
         }
       }
 
-      /*
-       * Update local status.
-       */
+      /* ========================================================
+         UPDATE LOCAL STATUS
+         ======================================================== */
+
       setCurrentDocumentStatusId(
         Number(
           finalStatusId
         )
       );
 
-      /*
-       * Success
-       */
+      /* ========================================================
+         SUCCESS
+         ======================================================== */
+
       messageApi.success(
         isEditMode
           ? "Purchase invoice updated successfully."
-          : "Purchase invoice created successfully."
+          : generatedVoucherNo
+            ? `Purchase invoice ${generatedVoucherNo} created successfully.`
+            : "Purchase invoice created successfully."
       );
 
       if (onSaved) {
@@ -1176,17 +1224,10 @@ export default function PurchaseInvoiceForm({
     }
   }
 
-  /*
-   * POST / RECEIVE PURCHASE
-   *
-   * This calls the backend Post endpoint.
-   *
-   * Backend will:
-   * - Change invoice status to POSTED
-   * - Create PURCHASE_IN stock movements
-   * - Increase stock balance
-   * - Recalculate average cost
-   */
+  /* ============================================================
+     POST / RECEIVE PURCHASE
+     ============================================================ */
+
   async function handlePostPurchase() {
     if (
       !isEditMode ||
@@ -1212,9 +1253,10 @@ export default function PurchaseInvoiceForm({
         currentDocumentStatusId
       );
 
-    /*
-     * Only DRAFT can be posted.
-     */
+    /* ========================================================
+       ONLY DRAFT CAN BE POSTED
+       ======================================================== */
+
     if (
       !draftId ||
       currentStatusId !==
@@ -1227,9 +1269,10 @@ export default function PurchaseInvoiceForm({
       return;
     }
 
-    /*
-     * Invoice must have items.
-     */
+    /* ========================================================
+       MUST HAVE ITEMS
+       ======================================================== */
+
     if (!items.length) {
       messageApi.error(
         "Cannot post purchase invoice without items."
@@ -1296,9 +1339,10 @@ export default function PurchaseInvoiceForm({
     }
   }
 
-  /*
-   * Table Columns
-   */
+  /* ============================================================
+     TABLE COLUMNS
+     ============================================================ */
+
   const itemColumns = [
     {
       title: "#",
@@ -1540,9 +1584,10 @@ export default function PurchaseInvoiceForm({
     },
   ];
 
-  /*
-   * Loading
-   */
+  /* ============================================================
+     INITIAL LOADING
+     ============================================================ */
+
   if (initialLoading) {
     return (
       <>
@@ -1556,6 +1601,10 @@ export default function PurchaseInvoiceForm({
       </>
     );
   }
+
+  /* ============================================================
+     UI
+     ============================================================ */
 
   return (
     <>
@@ -1620,6 +1669,7 @@ export default function PurchaseInvoiceForm({
           form={form}
           layout="vertical"
           initialValues={{
+            invoiceNumber: "",
             invoiceDate:
               dayjs(),
             exchangeRate: 1,
@@ -1630,10 +1680,6 @@ export default function PurchaseInvoiceForm({
             handleSave()
           }
           onKeyDown={(e) => {
-            /*
-             * Prevent Enter inside
-             * InputNumber from submitting.
-             */
             if (
               e.key === "Enter" &&
               e.target?.closest?.(
@@ -1646,29 +1692,32 @@ export default function PurchaseInvoiceForm({
           }}
         >
           <Row gutter={16}>
+            {/* ==================================================
+                VOUCHER NUMBER
+                ================================================== */}
+
             <Col
               xs={24}
               md={8}
             >
               <Form.Item
-                label="Invoice Number"
+                label="Voucher No"
                 name="invoiceNumber"
-                rules={[
-                  {
-                    required: true,
-                    message:
-                      "Please enter invoice number.",
-                  },
-                ]}
               >
                 <Input
-                  placeholder="Invoice Number"
-                  disabled={
+                  placeholder={
                     isEditMode
+                      ? "Voucher No"
+                      : "Auto generated after save"
                   }
+                  disabled
                 />
               </Form.Item>
             </Col>
+
+            {/* ==================================================
+                DATE
+                ================================================== */}
 
             <Col
               xs={24}
@@ -1694,6 +1743,10 @@ export default function PurchaseInvoiceForm({
               </Form.Item>
             </Col>
 
+            {/* ==================================================
+                SUPPLIER
+                ================================================== */}
+
             <Col
               xs={24}
               md={8}
@@ -1716,6 +1769,10 @@ export default function PurchaseInvoiceForm({
           </Row>
 
           <Row gutter={16}>
+            {/* ==================================================
+                WAREHOUSE
+                ================================================== */}
+
             <Col
               xs={24}
               md={8}
@@ -1742,6 +1799,10 @@ export default function PurchaseInvoiceForm({
               </Form.Item>
             </Col>
 
+            {/* ==================================================
+                CURRENCY
+                ================================================== */}
+
             <Col
               xs={24}
               md={8}
@@ -1767,6 +1828,10 @@ export default function PurchaseInvoiceForm({
                 />
               </Form.Item>
             </Col>
+
+            {/* ==================================================
+                EXCHANGE RATE
+                ================================================== */}
 
             <Col
               xs={24}
@@ -1795,6 +1860,10 @@ export default function PurchaseInvoiceForm({
           </Row>
 
           <Divider />
+
+          {/* ====================================================
+              PURCHASE ITEMS
+              ==================================================== */}
 
           <Space
             orientation="horizontal"
@@ -1836,6 +1905,10 @@ export default function PurchaseInvoiceForm({
           />
 
           <Divider />
+
+          {/* ====================================================
+              NOTES + TOTAL
+              ==================================================== */}
 
           <Row gutter={24}>
             <Col
@@ -1947,6 +2020,10 @@ export default function PurchaseInvoiceForm({
 
           <Divider />
 
+          {/* ====================================================
+              BUTTONS
+              ==================================================== */}
+
           <Space
             orientation="horizontal"
             style={{
@@ -1961,6 +2038,10 @@ export default function PurchaseInvoiceForm({
             >
               Cancel
             </Button>
+
+            {/* ==================================================
+                NEW PURCHASE
+                ================================================== */}
 
             {!isEditMode && (
               <Button
@@ -1986,6 +2067,10 @@ export default function PurchaseInvoiceForm({
               </Button>
             )}
 
+            {/* ==================================================
+                EDIT PURCHASE
+                ================================================== */}
+
             {isEditMode && (
               <Button
                 type="primary"
@@ -2000,6 +2085,10 @@ export default function PurchaseInvoiceForm({
                 Update
               </Button>
             )}
+
+            {/* ==================================================
+                POST / RECEIVE
+                ================================================== */}
 
             {isEditMode &&
               Number(

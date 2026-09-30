@@ -1,6 +1,5 @@
 using InfinityPOS.API.Data;
 using InfinityPOS.API.Data.Models;
-using InfinityPOS.API.DTOs;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,172 +9,201 @@ namespace InfinityPOS.API.Controllers;
 [Route("api/[controller]")]
 public class SuppliersController : ControllerBase
 {
-    private readonly InfinityPosDbContext _db;
+    private readonly InfinityPosDbContext _context;
 
-    public SuppliersController(InfinityPosDbContext db)
+    public SuppliersController(InfinityPosDbContext context)
     {
-        _db = db;
+        _context = context;
     }
 
+    // ============================================================
+    // GET: api/suppliers
+    // GET: api/suppliers?isActive=true
+    // ============================================================
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<SupplierDto>>> GetSuppliers()
+    public async Task<ActionResult<IEnumerable<Supplier>>> GetSuppliers(
+        [FromQuery] bool? isActive = null)
     {
-        var suppliers = await _db.Suppliers
-            .AsNoTracking()
-            .Where(s => s.IsActive)
-            .Select(s => new SupplierDto
-            {
-                SupplierId = s.SupplierId,
-                SupplierCode = s.SupplierCode,
-                SupplierName = s.SupplierName,
-                Phone = s.Phone,
-                Email = s.Email,
-                Address = s.Address,
-                IsActive = s.IsActive,
-                CreatedAt = s.CreatedAt
-            })
+        IQueryable<Supplier> query = _context.Suppliers
+            .AsNoTracking();
+
+        if (isActive.HasValue)
+        {
+            query = query.Where(x => x.IsActive == isActive.Value);
+        }
+
+        var suppliers = await query
+            .OrderBy(x => x.SupplierName)
             .ToListAsync();
 
         return Ok(suppliers);
     }
 
-    [HttpGet("{id}")]
-    public async Task<ActionResult<SupplierDto>> GetSupplier(int id)
+    // ============================================================
+    // GET: api/suppliers/5
+    // ============================================================
+    [HttpGet("{id:int}")]
+    public async Task<ActionResult<Supplier>> GetSupplier(int id)
     {
-        var supplier = await _db.Suppliers
+        var supplier = await _context.Suppliers
             .AsNoTracking()
-            .Where(s => s.SupplierId == id)
-            .Select(s => new SupplierDto
-            {
-                SupplierId = s.SupplierId,
-                SupplierCode = s.SupplierCode,
-                SupplierName = s.SupplierName,
-                Phone = s.Phone,
-                Email = s.Email,
-                Address = s.Address,
-                IsActive = s.IsActive,
-                CreatedAt = s.CreatedAt
-            })
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(x => x.SupplierId == id);
 
         if (supplier == null)
         {
-            return NotFound();
+            return NotFound(new
+            {
+                message = "Supplier not found."
+            });
         }
 
         return Ok(supplier);
     }
 
+    // ============================================================
+    // POST: api/suppliers
+    // ============================================================
     [HttpPost]
-    public async Task<ActionResult<SupplierDto>> CreateSupplier(
-        CreateSupplierDto dto)
+    public async Task<ActionResult<Supplier>> CreateSupplier(
+        [FromBody] Supplier supplier)
     {
-        var codeExists = await _db.Suppliers
-            .AnyAsync(s => s.SupplierCode == dto.SupplierCode);
+        if (supplier == null)
+        {
+            return BadRequest(new
+            {
+                message = "Supplier data is required."
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(supplier.SupplierCode))
+        {
+            return BadRequest(new
+            {
+                message = "Supplier code is required."
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(supplier.SupplierName))
+        {
+            return BadRequest(new
+            {
+                message = "Supplier name is required."
+            });
+        }
+
+        var codeExists = await _context.Suppliers
+            .AnyAsync(x => x.SupplierCode == supplier.SupplierCode);
 
         if (codeExists)
         {
-            return BadRequest(
-                $"Supplier Code '{dto.SupplierCode}' already exists."
-            );
+            return Conflict(new
+            {
+                message = "Supplier code already exists."
+            });
         }
 
-        var supplier = new Supplier
-        {
-            SupplierCode = dto.SupplierCode,
-            SupplierName = dto.SupplierName,
-            Phone = dto.Phone,
-            Email = dto.Email,
-            Address = dto.Address,
-            IsActive = true
-        };
+        supplier.SupplierId = 0;
+        supplier.CreatedAt = DateTime.Now;
 
-        _db.Suppliers.Add(supplier);
+        _context.Suppliers.Add(supplier);
 
-        await _db.SaveChangesAsync();
-
-        var result = new SupplierDto
-        {
-            SupplierId = supplier.SupplierId,
-            SupplierCode = supplier.SupplierCode,
-            SupplierName = supplier.SupplierName,
-            Phone = supplier.Phone,
-            Email = supplier.Email,
-            Address = supplier.Address,
-            IsActive = supplier.IsActive,
-            CreatedAt = supplier.CreatedAt
-        };
+        await _context.SaveChangesAsync();
 
         return CreatedAtAction(
             nameof(GetSupplier),
             new { id = supplier.SupplierId },
-            result
-        );
+            supplier);
     }
 
-    [HttpPut("{id}")]
-    public async Task<ActionResult<SupplierDto>> UpdateSupplier(
+    // ============================================================
+    // PUT: api/suppliers/5
+    // ============================================================
+    [HttpPut("{id:int}")]
+    public async Task<IActionResult> UpdateSupplier(
         int id,
-        UpdateSupplierDto dto)
+        [FromBody] Supplier supplier)
     {
-        var supplier = await _db.Suppliers
-            .FirstOrDefaultAsync(s => s.SupplierId == id);
-
         if (supplier == null)
         {
-            return NotFound();
+            return BadRequest(new
+            {
+                message = "Supplier data is required."
+            });
         }
 
-        var codeExists = await _db.Suppliers
-            .AnyAsync(s =>
-                s.SupplierCode == dto.SupplierCode &&
-                s.SupplierId != id);
+        var existingSupplier = await _context.Suppliers
+            .FirstOrDefaultAsync(x => x.SupplierId == id);
+
+        if (existingSupplier == null)
+        {
+            return NotFound(new
+            {
+                message = "Supplier not found."
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(supplier.SupplierCode))
+        {
+            return BadRequest(new
+            {
+                message = "Supplier code is required."
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(supplier.SupplierName))
+        {
+            return BadRequest(new
+            {
+                message = "Supplier name is required."
+            });
+        }
+
+        var codeExists = await _context.Suppliers
+            .AnyAsync(x =>
+                x.SupplierId != id &&
+                x.SupplierCode == supplier.SupplierCode);
 
         if (codeExists)
         {
-            return BadRequest(
-                $"Supplier Code '{dto.SupplierCode}' already exists."
-            );
+            return Conflict(new
+            {
+                message = "Supplier code already exists."
+            });
         }
 
-        supplier.SupplierCode = dto.SupplierCode;
-        supplier.SupplierName = dto.SupplierName;
-        supplier.Phone = dto.Phone;
-        supplier.Email = dto.Email;
-        supplier.Address = dto.Address;
-        supplier.IsActive = dto.IsActive;
+        existingSupplier.SupplierCode = supplier.SupplierCode;
+        existingSupplier.SupplierName = supplier.SupplierName;
+        existingSupplier.Phone = supplier.Phone;
+        existingSupplier.Email = supplier.Email;
+        existingSupplier.Address = supplier.Address;
+        existingSupplier.IsActive = supplier.IsActive;
 
-        await _db.SaveChangesAsync();
+        await _context.SaveChangesAsync();
 
-        var result = new SupplierDto
-        {
-            SupplierId = supplier.SupplierId,
-            SupplierCode = supplier.SupplierCode,
-            SupplierName = supplier.SupplierName,
-            Phone = supplier.Phone,
-            Email = supplier.Email,
-            Address = supplier.Address,
-            IsActive = supplier.IsActive,
-            CreatedAt = supplier.CreatedAt
-        };
-
-        return Ok(result);
+        return Ok(existingSupplier);
     }
 
-    [HttpDelete("{id}")]
+    // ============================================================
+    // DELETE: api/suppliers/5
+    // Soft Delete
+    // ============================================================
+    [HttpDelete("{id:int}")]
     public async Task<IActionResult> DeleteSupplier(int id)
     {
-        var supplier = await _db.Suppliers
-            .FirstOrDefaultAsync(s => s.SupplierId == id);
+        var supplier = await _context.Suppliers
+            .FirstOrDefaultAsync(x => x.SupplierId == id);
 
         if (supplier == null)
         {
-            return NotFound();
+            return NotFound(new
+            {
+                message = "Supplier not found."
+            });
         }
 
         supplier.IsActive = false;
 
-        await _db.SaveChangesAsync();
+        await _context.SaveChangesAsync();
 
         return NoContent();
     }

@@ -2,7 +2,6 @@ namespace InfinityPOS.API.DTOs;
 
 public class CreatePurchaseInvoiceDto
 {
-    public string InvoiceNumber { get; set; } = null!;
     public DateTime? InvoiceDate { get; set; }
 
     public int? SupplierId { get; set; }

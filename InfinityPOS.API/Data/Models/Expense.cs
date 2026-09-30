@@ -27,11 +27,17 @@ public partial class Expense
 
     public int? CreatedByUserId { get; set; }
 
+    // Payment Account
+    public int PaymentAccountId { get; set; }
+
     public virtual User? CreatedByUser { get; set; }
 
     public virtual Currency Currency { get; set; } = null!;
 
     public virtual DocumentStatus DocumentStatus { get; set; } = null!;
 
+    public virtual Account PaymentAccount { get; set; } = null!;
+
     public virtual ICollection<ExpenseItem> ExpenseItems { get; set; } = new List<ExpenseItem>();
 }
+
