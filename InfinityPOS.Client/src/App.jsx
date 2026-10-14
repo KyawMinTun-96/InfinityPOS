@@ -11,6 +11,8 @@ import SalesInvoiceForm from "./pages/sales/SalesInvoiceForm";
 import Expenses from "./pages/expenses/Expenses";
 import ExpenseForm from "./pages/expenses/ExpenseForm";
 
+import CashManagement from "./pages/CashManagement/CashManagement";
+
 import {
   Layout,
   Menu,
@@ -36,6 +38,7 @@ import {
   BarChartOutlined,
   SettingOutlined,
   LogoutOutlined,
+  WalletOutlined,
 } from "@ant-design/icons";
 
 import Login from "./pages/auth/Login";
@@ -93,49 +96,69 @@ function Dashboard({ user, onLogout }) {
       icon: <DashboardOutlined />,
       label: "Dashboard",
     },
+
     {
       key: "sales",
       icon: <ShoppingCartOutlined />,
       label: "Sales",
     },
+
     {
       key: "products",
       icon: <AppstoreOutlined />,
       label: "Products",
     },
+
     {
       key: "purchases",
       icon: <ShoppingOutlined />,
       label: "Purchases",
     },
+
     {
       key: "stock",
       icon: <DatabaseOutlined />,
       label: "Stock Balance",
     },
+
     {
       key: "customers",
       icon: <UserOutlined />,
       label: "Customers",
     },
+
     {
       key: "suppliers",
       icon: <TeamOutlined />,
       label: "Suppliers",
     },
+
     {
       key: "expenses",
       icon: <DollarOutlined />,
       label: "Expenses",
     },
+
+    /* =========================
+       CASH MANAGEMENT
+    ========================= */
+
+    {
+      key: "cash",
+      icon: <WalletOutlined />,
+      label: "Cash Management",
+    },
+
     {
       key: "reports",
       icon: <BarChartOutlined />,
       label: "Reports",
     },
+
     {
       type: "divider",
     },
+
     {
       key: "settings",
       icon: <SettingOutlined />,
@@ -735,6 +758,14 @@ function Dashboard({ user, onLogout }) {
           )}
 
           {/* =========================
+              CASH MANAGEMENT
+          ========================= */}
+
+          {selectedMenu === "cash" && (
+            <CashManagement />
+          )}
+
+          {/* =========================
               OTHER MODULES
           ========================= */}
 
@@ -743,7 +774,8 @@ function Dashboard({ user, onLogout }) {
             selectedMenu !== "products" &&
             selectedMenu !== "purchases" &&
             selectedMenu !== "stock" &&
-            selectedMenu !== "expenses" && (
+            selectedMenu !== "expenses" &&
+            selectedMenu !== "cash" && (
               <Card>
                 <Title level={3}>
                   {
@@ -804,4 +836,3 @@ function App() {
 }
 
 export default App;
-

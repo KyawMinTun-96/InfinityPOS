@@ -49,28 +49,25 @@ import { getCurrencies } from "../../api/currenciesApi";
 import { getProducts } from "../../api/productsApi";
 import { getDocumentStatuses } from "../../api/documentStatusesApi";
 
+import { getPaymentMethods } from "../../api/paymentMethodsApi";
+
+import {
+  getPurchasePaymentsByInvoice,
+  createPurchasePayment,
+  updatePurchasePayment,
+} from "../../api/purchasePaymentsApi";
+
 const { TextArea } = Input;
 const { Title, Text } = Typography;
 
-/* ============================================================
-   HELPERS
-   ============================================================ */
-
-function getValue(
-  obj,
-  camelCaseName,
-  pascalCaseName
-) {
+function getValue(obj, camelCaseName, pascalCaseName) {
   return (
     obj?.[camelCaseName] ??
     obj?.[pascalCaseName]
   );
 }
 
-function normalizeItem(
-  item,
-  index = 0
-) {
+function normalizeItem(item, index = 0) {
   return {
     key:
       getValue(
@@ -143,10 +140,6 @@ function normalizeItem(
   };
 }
 
-/* ============================================================
-   COMPONENT
-   ============================================================ */
-
 export default function PurchaseInvoiceForm({
   purchaseInvoiceId,
   onCancel,
@@ -154,18 +147,14 @@ export default function PurchaseInvoiceForm({
 }) {
   const [form] = Form.useForm();
 
-  const [
-    messageApi,
-    contextHolder,
-  ] = message.useMessage();
+  const [messageApi, contextHolder] =
+    message.useMessage();
 
   const [loading, setLoading] =
     useState(false);
 
-  const [
-    initialLoading,
-    setInitialLoading,
-  ] = useState(false);
+  const [initialLoading, setInitialLoading] =
+    useState(false);
 
   const [suppliers, setSuppliers] =
     useState([]);
@@ -183,6 +172,15 @@ export default function PurchaseInvoiceForm({
     documentStatuses,
     setDocumentStatuses,
   ] = useState([]);
+
+  const [paymentMethods, setPaymentMethods] =
+    useState([]);
+
+  const [existingPayment, setExistingPayment] =
+    useState(null);
+
+  const [paymentAmountTouched, setPaymentAmountTouched] =
+    useState(false);
 
   const [items, setItems] =
     useState([]);
@@ -212,9 +210,15 @@ export default function PurchaseInvoiceForm({
       form
     ) ?? 0;
 
-  /* ============================================================
-     LOAD DATA
-     ============================================================ */
+  const paymentAmount =
+    Form.useWatch(
+      "paymentAmount",
+      form
+    ) ?? 0;
+
+  /* =========================================================
+     LOAD PURCHASE DATA
+  ========================================================= */
 
   useEffect(() => {
     let cancelled = false;
@@ -229,54 +233,51 @@ export default function PurchaseInvoiceForm({
           currenciesData,
           productsData,
           statusesData,
+          paymentMethodsData,
         ] = await Promise.all([
           getSuppliers(true),
           getWarehouses(true),
           getCurrencies(true),
           getProducts(true),
-          getDocumentStatuses(
-            "PURCHASE"
-          ),
+          getDocumentStatuses("PURCHASE"),
+          getPaymentMethods(),
         ]);
 
-        if (cancelled) {
-          return;
-        }
+        if (cancelled) return;
 
-        setSuppliers(
-          suppliersData ?? []
+        setSuppliers(suppliersData ?? []);
+        setWarehouses(warehousesData ?? []);
+        setCurrencies(currenciesData ?? []);
+        setProducts(productsData ?? []);
+        setDocumentStatuses(statusesData ?? []);
+        setPaymentMethods(
+          paymentMethodsData ?? []
         );
 
-        setWarehouses(
-          warehousesData ?? []
-        );
-
-        setCurrencies(
-          currenciesData ?? []
-        );
-
-        setProducts(
-          productsData ?? []
-        );
-
-        setDocumentStatuses(
-          statusesData ?? []
-        );
-
-        /* ======================================================
+        /* =====================================================
            NEW PURCHASE
-           ====================================================== */
+        ===================================================== */
 
         if (!purchaseInvoiceId) {
-          setCurrentDocumentStatusId(
-            null
-          );
-
+          setCurrentDocumentStatusId(null);
           setItems([]);
-
           setOriginalItemIds([]);
+          setExistingPayment(null);
+          setPaymentAmountTouched(false);
 
           form.resetFields();
+
+          const cashMethod =
+            (paymentMethodsData ?? []).find(
+              (method) =>
+                String(
+                  getValue(
+                    method,
+                    "methodCode",
+                    "MethodCode"
+                  )
+                ).toUpperCase() === "CASH"
+            );
 
           form.setFieldsValue({
             invoiceNumber: "",
@@ -284,28 +285,48 @@ export default function PurchaseInvoiceForm({
             exchangeRate: 1,
             discountAmount: 0,
             taxAmount: 0,
+
+            paymentMethodId:
+              cashMethod
+                ? Number(
+                    getValue(
+                      cashMethod,
+                      "paymentMethodId",
+                      "PaymentMethodId"
+                    )
+                  )
+                : undefined,
+
+            paymentAmount: 0,
+            paymentReference: "",
           });
 
           return;
         }
 
-        /* ======================================================
+        /* =====================================================
            EDIT PURCHASE
-           ====================================================== */
+        ===================================================== */
 
-        const invoice =
-          await getPurchaseInvoice(
+        const [
+          invoice,
+          invoiceItems,
+          loadedPayments,
+        ] = await Promise.all([
+          getPurchaseInvoice(
             purchaseInvoiceId
-          );
+          ),
 
-        const invoiceItems =
-          await getPurchaseInvoiceItemsByInvoice(
+          getPurchaseInvoiceItemsByInvoice(
             purchaseInvoiceId
-          );
+          ),
 
-        if (cancelled) {
-          return;
-        }
+          getPurchasePaymentsByInvoice(
+            purchaseInvoiceId
+          ),
+        ]);
+
+        if (cancelled) return;
 
         const loadedStatusId =
           getValue(
@@ -319,9 +340,7 @@ export default function PurchaseInvoiceForm({
         );
 
         const normalizedItems =
-          (
-            invoiceItems ?? []
-          ).map(
+          (invoiceItems ?? []).map(
             (item, index) =>
               normalizeItem(
                 item,
@@ -329,9 +348,7 @@ export default function PurchaseInvoiceForm({
               )
           );
 
-        setItems(
-          normalizedItems
-        );
+        setItems(normalizedItems);
 
         setOriginalItemIds(
           normalizedItems
@@ -342,9 +359,25 @@ export default function PurchaseInvoiceForm({
             .filter(Boolean)
         );
 
-        /* ======================================================
-           FILL FORM
-           ====================================================== */
+        const firstPayment =
+          Array.isArray(loadedPayments) &&
+          loadedPayments.length > 0
+            ? loadedPayments[0]
+            : null;
+
+        setExistingPayment(
+          firstPayment
+        );
+
+        if (firstPayment) {
+          setPaymentAmountTouched(
+            true
+          );
+        } else {
+          setPaymentAmountTouched(
+            false
+          );
+        }
 
         form.setFieldsValue({
           invoiceNumber:
@@ -423,11 +456,40 @@ export default function PurchaseInvoiceForm({
               "notes",
               "Notes"
             ),
+
+          paymentMethodId:
+            firstPayment
+              ? Number(
+                  getValue(
+                    firstPayment,
+                    "paymentMethodId",
+                    "PaymentMethodId"
+                  )
+                )
+              : undefined,
+
+          paymentAmount:
+            firstPayment
+              ? Number(
+                  getValue(
+                    firstPayment,
+                    "amount",
+                    "Amount"
+                  ) ?? 0
+                )
+              : 0,
+
+          paymentReference:
+            firstPayment
+              ? getValue(
+                  firstPayment,
+                  "referenceNumber",
+                  "ReferenceNumber"
+                ) ?? ""
+              : "",
         });
       } catch (error) {
-        if (cancelled) {
-          return;
-        }
+        if (cancelled) return;
 
         console.error(
           "FAILED TO LOAD PURCHASE INVOICE:",
@@ -435,8 +497,7 @@ export default function PurchaseInvoiceForm({
         );
 
         messageApi.error(
-          error?.response?.data
-            ?.message ||
+          error?.response?.data?.message ||
             error?.message ||
             "Failed to load purchase invoice."
         );
@@ -458,204 +519,32 @@ export default function PurchaseInvoiceForm({
     messageApi,
   ]);
 
-  /* ============================================================
-     OPTIONS
-     ============================================================ */
-
-  const productOptions =
-    useMemo(() => {
-      return (
-        products ?? []
-      ).map((product) => ({
-        value: getValue(
-          product,
-          "productId",
-          "ProductId"
-        ),
-
-        label: `${
-          getValue(
-            product,
-            "sku",
-            "SKU"
-          ) ?? ""
-        } - ${
-          getValue(
-            product,
-            "productName",
-            "ProductName"
-          ) ?? ""
-        }`,
-      }));
-    }, [products]);
-
-  const supplierOptions =
-    useMemo(() => {
-      return (
-        suppliers ?? []
-      ).map((supplier) => ({
-        value: getValue(
-          supplier,
-          "supplierId",
-          "SupplierId"
-        ),
-
-        label:
-          getValue(
-            supplier,
-            "supplierName",
-            "SupplierName"
-          ) ??
-          getValue(
-            supplier,
-            "name",
-            "Name"
-          ) ??
-          `Supplier ${
-            getValue(
-              supplier,
-              "supplierId",
-              "SupplierId"
-            )
-          }`,
-      }));
-    }, [suppliers]);
-
-  const warehouseOptions =
-    useMemo(() => {
-      return (
-        warehouses ?? []
-      ).map((warehouse) => ({
-        value: getValue(
-          warehouse,
-          "warehouseId",
-          "WarehouseId"
-        ),
-
-        label:
-          getValue(
-            warehouse,
-            "warehouseName",
-            "WarehouseName"
-          ) ??
-          getValue(
-            warehouse,
-            "name",
-            "Name"
-          ) ??
-          `Warehouse ${
-            getValue(
-              warehouse,
-              "warehouseId",
-              "WarehouseId"
-            )
-          }`,
-      }));
-    }, [warehouses]);
-
-  const currencyOptions =
-    useMemo(() => {
-      return (
-        currencies ?? []
-      ).map((currency) => ({
-        value: getValue(
-          currency,
-          "currencyId",
-          "CurrencyId"
-        ),
-
-        label:
-          getValue(
-            currency,
-            "currencyName",
-            "CurrencyName"
-          ) ??
-          getValue(
-            currency,
-            "name",
-            "Name"
-          ) ??
-          getValue(
-            currency,
-            "currencyCode",
-            "CurrencyCode"
-          ) ??
-          `Currency ${
-            getValue(
-              currency,
-              "currencyId",
-              "CurrencyId"
-            )
-          }`,
-      }));
-    }, [currencies]);
-
-  /* ============================================================
-     STATUS
-     ============================================================ */
-
-  const draftStatus =
-    useMemo(() => {
-      return (
-        documentStatuses ?? []
-      ).find((status) => {
-        return (
-          getValue(
-            status,
-            "statusCode",
-            "StatusCode"
-          ) === "DRAFT"
-        );
-      });
-    }, [documentStatuses]);
-
-  const postedStatus =
-    useMemo(() => {
-      return (
-        documentStatuses ?? []
-      ).find((status) => {
-        return (
-          getValue(
-            status,
-            "statusCode",
-            "StatusCode"
-          ) === "POSTED"
-        );
-      });
-    }, [documentStatuses]);
-
-  /* ============================================================
-     SUBTOTAL
-     ============================================================ */
+  /* =========================================================
+     AUTO SYNC PAYMENT AMOUNT WITH TOTAL
+     
+     Only happens when user has not manually changed
+     the payment amount.
+  ========================================================= */
 
   const subtotal =
     useMemo(() => {
       return items.reduce(
         (sum, item) => {
           const quantity =
-            Number(
-              item.quantity
-            ) || 0;
+            Number(item.quantity) || 0;
 
           const unitCost =
-            Number(
-              item.unitCost
-            ) || 0;
+            Number(item.unitCost) || 0;
 
           const discount =
-            Number(
-              item.discountAmount
-            ) || 0;
+            Number(item.discountAmount) || 0;
 
           const tax =
-            Number(
-              item.taxAmount
-            ) || 0;
+            Number(item.taxAmount) || 0;
 
           return (
             sum +
-            quantity *
-              unitCost -
+            quantity * unitCost -
             discount +
             tax
           );
@@ -664,34 +553,221 @@ export default function PurchaseInvoiceForm({
       );
     }, [items]);
 
-  /* ============================================================
-     TOTAL
-     ============================================================ */
-
   const totalAmount =
     subtotal -
-    (Number(
-      discountAmount
-    ) || 0) +
-    (Number(
-      taxAmount
-    ) || 0);
+    (Number(discountAmount) || 0) +
+    (Number(taxAmount) || 0);
 
-  /* ============================================================
+  useEffect(() => {
+    if (
+      !paymentAmountTouched &&
+      !existingPayment
+    ) {
+      form.setFieldValue(
+        "paymentAmount",
+        Number(totalAmount)
+      );
+    }
+  }, [
+    totalAmount,
+    paymentAmountTouched,
+    existingPayment,
+    form,
+  ]);
+
+  /* =========================================================
+     OPTIONS
+  ========================================================= */
+
+  const productOptions =
+    useMemo(() => {
+      return (products ?? []).map(
+        (product) => ({
+          value: getValue(
+            product,
+            "productId",
+            "ProductId"
+          ),
+
+          label: `${
+            getValue(
+              product,
+              "sku",
+              "SKU"
+            ) ?? ""
+          } - ${
+            getValue(
+              product,
+              "productName",
+              "ProductName"
+            ) ?? ""
+          }`,
+        })
+      );
+    }, [products]);
+
+  const supplierOptions =
+    useMemo(() => {
+      return (suppliers ?? []).map(
+        (supplier) => ({
+          value: getValue(
+            supplier,
+            "supplierId",
+            "SupplierId"
+          ),
+
+          label:
+            getValue(
+              supplier,
+              "supplierName",
+              "SupplierName"
+            ) ??
+            getValue(
+              supplier,
+              "name",
+              "Name"
+            ) ??
+            `Supplier ${getValue(
+              supplier,
+              "supplierId",
+              "SupplierId"
+            )}`,
+        })
+      );
+    }, [suppliers]);
+
+  const warehouseOptions =
+    useMemo(() => {
+      return (warehouses ?? []).map(
+        (warehouse) => ({
+          value: getValue(
+            warehouse,
+            "warehouseId",
+            "WarehouseId"
+          ),
+
+          label:
+            getValue(
+              warehouse,
+              "warehouseName",
+              "WarehouseName"
+            ) ??
+            getValue(
+              warehouse,
+              "name",
+              "Name"
+            ) ??
+            `Warehouse ${getValue(
+              warehouse,
+              "warehouseId",
+              "WarehouseId"
+            )}`,
+        })
+      );
+    }, [warehouses]);
+
+  const currencyOptions =
+    useMemo(() => {
+      return (currencies ?? []).map(
+        (currency) => ({
+          value: getValue(
+            currency,
+            "currencyId",
+            "CurrencyId"
+          ),
+
+          label:
+            getValue(
+              currency,
+              "currencyName",
+              "CurrencyName"
+            ) ??
+            getValue(
+              currency,
+              "name",
+              "Name"
+            ) ??
+            getValue(
+              currency,
+              "currencyCode",
+              "CurrencyCode"
+            ) ??
+            `Currency ${getValue(
+              currency,
+              "currencyId",
+              "CurrencyId"
+            )}`,
+        })
+      );
+    }, [currencies]);
+
+  const paymentMethodOptions =
+    useMemo(() => {
+      return (paymentMethods ?? []).map(
+        (method) => ({
+          value: Number(
+            getValue(
+              method,
+              "paymentMethodId",
+              "PaymentMethodId"
+            )
+          ),
+
+          label:
+            getValue(
+              method,
+              "methodName",
+              "MethodName"
+            ) ??
+            getValue(
+              method,
+              "methodCode",
+              "MethodCode"
+            ) ??
+            `Payment Method ${getValue(
+              method,
+              "paymentMethodId",
+              "PaymentMethodId"
+            )}`,
+        })
+      );
+    }, [paymentMethods]);
+
+  const draftStatus =
+    useMemo(() => {
+      return (documentStatuses ?? []).find(
+        (status) =>
+          getValue(
+            status,
+            "statusCode",
+            "StatusCode"
+          ) === "DRAFT"
+      );
+    }, [documentStatuses]);
+
+  const postedStatus =
+    useMemo(() => {
+      return (documentStatuses ?? []).find(
+        (status) =>
+          getValue(
+            status,
+            "statusCode",
+            "StatusCode"
+          ) === "POSTED"
+      );
+    }, [documentStatuses]);
+
+  /* =========================================================
      CURRENT STATUS
-     ============================================================ */
+  ========================================================= */
 
   const currentStatus =
     useMemo(() => {
-      if (
-        !currentDocumentStatusId
-      ) {
+      if (!currentDocumentStatusId) {
         return null;
       }
 
-      return (
-        documentStatuses ?? []
-      ).find(
+      return (documentStatuses ?? []).find(
         (status) =>
           Number(
             getValue(
@@ -709,9 +785,9 @@ export default function PurchaseInvoiceForm({
       documentStatuses,
     ]);
 
-  /* ============================================================
-     ADD ITEM
-     ============================================================ */
+  /* =========================================================
+     ITEMS
+  ========================================================= */
 
   function addItem() {
     setItems((prev) => [
@@ -719,30 +795,18 @@ export default function PurchaseInvoiceForm({
 
       normalizeItem(
         {
-          productId:
-            undefined,
-
+          productId: undefined,
           quantity: 1,
-
           unitCost: 0,
-
           salePrice: 0,
-
           discountAmount: 0,
-
           taxAmount: 0,
-
           totalAmount: 0,
         },
-
         prev.length
       ),
     ]);
   }
-
-  /* ============================================================
-     REMOVE ITEM
-     ============================================================ */
 
   function removeItem(key) {
     setItems((prev) =>
@@ -753,10 +817,6 @@ export default function PurchaseInvoiceForm({
     );
   }
 
-  /* ============================================================
-     UPDATE ITEM
-     ============================================================ */
-
   function updateItem(
     key,
     field,
@@ -764,9 +824,7 @@ export default function PurchaseInvoiceForm({
   ) {
     setItems((prev) =>
       prev.map((item) => {
-        if (
-          item.key !== key
-        ) {
+        if (item.key !== key) {
           return item;
         }
 
@@ -776,14 +834,10 @@ export default function PurchaseInvoiceForm({
         };
 
         const quantity =
-          Number(
-            updated.quantity
-          ) || 0;
+          Number(updated.quantity) || 0;
 
         const unitCost =
-          Number(
-            updated.unitCost
-          ) || 0;
+          Number(updated.unitCost) || 0;
 
         const discount =
           Number(
@@ -796,8 +850,7 @@ export default function PurchaseInvoiceForm({
           ) || 0;
 
         updated.totalAmount =
-          quantity *
-            unitCost -
+          quantity * unitCost -
           discount +
           tax;
 
@@ -806,9 +859,94 @@ export default function PurchaseInvoiceForm({
     );
   }
 
-  /* ============================================================
-     SAVE / UPDATE
-     ============================================================ */
+  /* =========================================================
+     SAVE PAYMENT
+  ========================================================= */
+
+  async function savePayment(
+    savedInvoiceId,
+    values
+  ) {
+    const selectedPaymentMethodId =
+      Number(
+        values.paymentMethodId
+      );
+
+    const selectedPaymentAmount =
+      Number(
+        values.paymentAmount
+      );
+
+    if (
+      !selectedPaymentMethodId
+    ) {
+      throw new Error(
+        "Please select a payment method."
+      );
+    }
+
+    if (
+      !Number.isFinite(
+        selectedPaymentAmount
+      ) ||
+      selectedPaymentAmount <= 0
+    ) {
+      throw new Error(
+        "Payment amount must be greater than 0."
+      );
+    }
+
+    if (
+      selectedPaymentAmount >
+        Number(totalAmount) +
+          0.000001
+    ) {
+      throw new Error(
+        "Payment amount cannot exceed invoice total."
+      );
+    }
+
+    const paymentData = {
+      purchaseInvoiceId:
+        Number(savedInvoiceId),
+
+      paymentMethodId:
+        selectedPaymentMethodId,
+
+      amount:
+        selectedPaymentAmount,
+
+      paymentDate:
+        values.invoiceDate
+          ? values.invoiceDate.toISOString()
+          : new Date().toISOString(),
+
+      referenceNumber:
+        values.paymentReference
+          ?.trim() || null,
+
+      notes: null,
+    };
+
+    if (existingPayment) {
+      await updatePurchasePayment(
+        getValue(
+          existingPayment,
+          "purchasePaymentId",
+          "PurchasePaymentId"
+        ),
+        paymentData
+      );
+    } else {
+      await createPurchasePayment(
+        paymentData
+      );
+    }
+  }
+
+  /* =========================================================
+     SAVE PURCHASE
+  ========================================================= */
 
   async function handleSave(
     statusId = null
@@ -819,12 +957,7 @@ export default function PurchaseInvoiceForm({
       const values =
         await form.validateFields();
 
-      /* ========================================================
-         DETERMINE STATUS
-         ======================================================== */
-
-      let finalStatusId =
-        statusId;
+      let finalStatusId = statusId;
 
       if (
         isEditMode &&
@@ -854,10 +987,6 @@ export default function PurchaseInvoiceForm({
         return;
       }
 
-      /* ========================================================
-         VALIDATE ITEMS
-         ======================================================== */
-
       if (!items.length) {
         messageApi.error(
           "Please add at least one purchase item."
@@ -871,8 +1000,7 @@ export default function PurchaseInvoiceForm({
         index < items.length;
         index++
       ) {
-        const item =
-          items[index];
+        const item = items[index];
 
         if (!item.productId) {
           messageApi.error(
@@ -885,9 +1013,7 @@ export default function PurchaseInvoiceForm({
         }
 
         if (
-          Number(
-            item.quantity
-          ) <= 0
+          Number(item.quantity) <= 0
         ) {
           messageApi.error(
             `Quantity must be greater than 0 for item ${
@@ -899,9 +1025,7 @@ export default function PurchaseInvoiceForm({
         }
 
         if (
-          Number(
-            item.unitCost
-          ) < 0
+          Number(item.unitCost) < 0
         ) {
           messageApi.error(
             `Unit cost cannot be negative for item ${
@@ -913,9 +1037,7 @@ export default function PurchaseInvoiceForm({
         }
 
         if (
-          Number(
-            item.salePrice
-          ) < 0
+          Number(item.salePrice) < 0
         ) {
           messageApi.error(
             `Sale price cannot be negative for item ${
@@ -927,34 +1049,76 @@ export default function PurchaseInvoiceForm({
         }
       }
 
-      /* ========================================================
+      /* =====================================================
+         PAYMENT VALIDATION
+      ===================================================== */
+
+      const selectedPaymentMethodId =
+        Number(
+          values.paymentMethodId
+        );
+
+      const selectedPaymentAmount =
+        Number(
+          values.paymentAmount
+        );
+
+      if (
+        !selectedPaymentMethodId
+      ) {
+        messageApi.error(
+          "Please select a payment method."
+        );
+
+        return;
+      }
+
+      if (
+        !Number.isFinite(
+          selectedPaymentAmount
+        ) ||
+        selectedPaymentAmount <= 0
+      ) {
+        messageApi.error(
+          "Payment amount must be greater than 0."
+        );
+
+        return;
+      }
+
+      if (
+        selectedPaymentAmount >
+          Number(totalAmount) +
+            0.000001
+      ) {
+        messageApi.error(
+          "Payment amount cannot exceed invoice total."
+        );
+
+        return;
+      }
+
+      /* =====================================================
          INVOICE DATA
-         
-         IMPORTANT:
-         New Purchase Voucher No is generated by BACKEND.
-         Existing Voucher No is kept when updating.
-         ======================================================== */
+      ===================================================== */
 
       const invoiceData = {
-        /*
-         * Existing purchase keeps its Voucher No.
-         *
-         * New purchase sends empty/null value.
-         * Backend will generate PV voucher number.
-         */
         invoiceNumber:
           isEditMode
             ? values.invoiceNumber
             : null,
 
-        invoiceDate:
-          values.invoiceDate
-            ? values.invoiceDate.toISOString()
-            : dayjs().toISOString(),
+            invoiceDate:
+              values.invoiceDate
+                ? values.invoiceDate.format(
+                    "YYYY-MM-DDT00:00:00"
+                  )
+                : dayjs().format(
+                    "YYYY-MM-DDT00:00:00"
+                  ),
 
         supplierId:
-          values.supplierId ??
-          null,
+          values.supplierId ?? null,
 
         warehouseId:
           values.warehouseId,
@@ -964,47 +1128,37 @@ export default function PurchaseInvoiceForm({
 
         exchangeRate:
           Number(
-            values.exchangeRate ??
-              1
+            values.exchangeRate ?? 1
           ),
 
         subTotal:
-          Number(
-            subtotal
-          ),
+          Number(subtotal),
 
         discountAmount:
           Number(
-            values.discountAmount ??
-              0
+            values.discountAmount ?? 0
           ),
 
         taxAmount:
           Number(
-            values.taxAmount ??
-              0
+            values.taxAmount ?? 0
           ),
 
         totalAmount:
-          Number(
-            totalAmount
-          ),
+          Number(totalAmount),
 
         documentStatusId:
-          Number(
-            finalStatusId
-          ),
+          Number(finalStatusId),
 
         notes:
-          values.notes ??
-          null,
+          values.notes ?? null,
       };
 
-      let savedInvoice;
+      /* =====================================================
+         SAVE INVOICE
+      ===================================================== */
 
-      /* ========================================================
-         UPDATE
-         ======================================================== */
+      let savedInvoice;
 
       if (isEditMode) {
         savedInvoice =
@@ -1012,22 +1166,12 @@ export default function PurchaseInvoiceForm({
             purchaseInvoiceId,
             invoiceData
           );
-      }
-
-      /* ========================================================
-         CREATE
-         ======================================================== */
-
-      else {
+      } else {
         savedInvoice =
           await createPurchaseInvoice(
             invoiceData
           );
       }
-
-      /* ========================================================
-         SAVED INVOICE ID
-         ======================================================== */
 
       const savedInvoiceId =
         isEditMode
@@ -1044,13 +1188,9 @@ export default function PurchaseInvoiceForm({
         );
       }
 
-      /* ========================================================
-         IMPORTANT:
-         Backend-generated Voucher No
-         
-         After CREATE, backend returns:
-         InvoiceNumber / Voucher Number
-         ======================================================== */
+      /* =====================================================
+         GENERATED VOUCHER NO
+      ===================================================== */
 
       const generatedVoucherNo =
         getValue(
@@ -1069,9 +1209,9 @@ export default function PurchaseInvoiceForm({
         });
       }
 
-      /* ========================================================
-         CURRENT ITEM IDS
-         ======================================================== */
+      /* =====================================================
+         SAVE ITEMS
+      ===================================================== */
 
       const existingItemIds =
         items
@@ -1081,31 +1221,19 @@ export default function PurchaseInvoiceForm({
           )
           .filter(Boolean);
 
-      /* ========================================================
-         UPDATE / CREATE ITEMS
-         ======================================================== */
-
       for (const item of items) {
         const itemData = {
           purchaseInvoiceId:
-            Number(
-              savedInvoiceId
-            ),
+            Number(savedInvoiceId),
 
           productId:
-            Number(
-              item.productId
-            ),
+            Number(item.productId),
 
           quantity:
-            Number(
-              item.quantity
-            ),
+            Number(item.quantity),
 
           unitCost:
-            Number(
-              item.unitCost
-            ),
+            Number(item.unitCost),
 
           salePrice:
             Number(
@@ -1114,20 +1242,17 @@ export default function PurchaseInvoiceForm({
 
           discountAmount:
             Number(
-              item.discountAmount ??
-                0
+              item.discountAmount ?? 0
             ),
 
           taxAmount:
             Number(
-              item.taxAmount ??
-                0
+              item.taxAmount ?? 0
             ),
 
           totalAmount:
             Number(
-              item.totalAmount ??
-                0
+              item.totalAmount ?? 0
             ),
         };
 
@@ -1145,9 +1270,9 @@ export default function PurchaseInvoiceForm({
         }
       }
 
-      /* ========================================================
+      /* =====================================================
          DELETE REMOVED ITEMS
-         ======================================================== */
+      ===================================================== */
 
       if (isEditMode) {
         const removedItemIds =
@@ -1168,19 +1293,50 @@ export default function PurchaseInvoiceForm({
         }
       }
 
-      /* ========================================================
-         UPDATE LOCAL STATUS
-         ======================================================== */
+      /* =====================================================
+         SAVE PAYMENT
+      ===================================================== */
 
-      setCurrentDocumentStatusId(
-        Number(
-          finalStatusId
-        )
+      await savePayment(
+        savedInvoiceId,
+        values
       );
 
-      /* ========================================================
-         SUCCESS
-         ======================================================== */
+      /* =====================================================
+         UPDATE LOCAL PAYMENT STATE
+      ===================================================== */
+
+      setExistingPayment({
+        purchaseInvoiceId:
+          Number(savedInvoiceId),
+
+        paymentMethodId:
+          selectedPaymentMethodId,
+
+        amount:
+          selectedPaymentAmount,
+
+        paymentDate:
+          values.invoiceDate
+            ? values.invoiceDate.format(
+                "YYYY-MM-DDT00:00:00"
+              )
+            : dayjs().format(
+                "YYYY-MM-DDT00:00:00"
+              ),
+
+        referenceNumber:
+          values.paymentReference
+            ?.trim() || null,
+      });
+
+      setPaymentAmountTouched(
+        true
+      );
+
+      setCurrentDocumentStatusId(
+        Number(finalStatusId)
+      );
 
       messageApi.success(
         isEditMode
@@ -1199,9 +1355,7 @@ export default function PurchaseInvoiceForm({
         error
       );
 
-      if (
-        error?.errorFields
-      ) {
+      if (error?.errorFields) {
         console.error(
           "FORM VALIDATION ERRORS:",
           error.errorFields
@@ -1214,8 +1368,7 @@ export default function PurchaseInvoiceForm({
       );
 
       messageApi.error(
-        error?.response?.data
-          ?.message ||
+        error?.response?.data?.message ||
           error?.message ||
           "Failed to save purchase."
       );
@@ -1224,9 +1377,9 @@ export default function PurchaseInvoiceForm({
     }
   }
 
-  /* ============================================================
-     POST / RECEIVE PURCHASE
-     ============================================================ */
+  /* =========================================================
+     POST PURCHASE
+  ========================================================= */
 
   async function handlePostPurchase() {
     if (
@@ -1240,27 +1393,23 @@ export default function PurchaseInvoiceForm({
       return;
     }
 
-    const draftId = Number(
-      getValue(
-        draftStatus,
-        "documentStatusId",
-        "DocumentStatusId"
-      )
-    );
+    const draftId =
+      Number(
+        getValue(
+          draftStatus,
+          "documentStatusId",
+          "DocumentStatusId"
+        )
+      );
 
     const currentStatusId =
       Number(
         currentDocumentStatusId
       );
 
-    /* ========================================================
-       ONLY DRAFT CAN BE POSTED
-       ======================================================== */
-
     if (
       !draftId ||
-      currentStatusId !==
-        draftId
+      currentStatusId !== draftId
     ) {
       messageApi.error(
         "Only DRAFT purchase invoices can be posted."
@@ -1268,10 +1417,6 @@ export default function PurchaseInvoiceForm({
 
       return;
     }
-
-    /* ========================================================
-       MUST HAVE ITEMS
-       ======================================================== */
 
     if (!items.length) {
       messageApi.error(
@@ -1281,8 +1426,65 @@ export default function PurchaseInvoiceForm({
       return;
     }
 
+    const values =
+      form.getFieldsValue();
+
+    const selectedPaymentMethodId =
+      Number(
+        values.paymentMethodId
+      );
+
+    const selectedPaymentAmount =
+      Number(
+        values.paymentAmount
+      );
+
+    if (
+      !selectedPaymentMethodId
+    ) {
+      messageApi.error(
+        "Please select a payment method before posting."
+      );
+
+      return;
+    }
+
+    if (
+      !Number.isFinite(
+        selectedPaymentAmount
+      ) ||
+      selectedPaymentAmount <= 0
+    ) {
+      messageApi.error(
+        "Payment amount must be greater than 0 before posting."
+      );
+
+      return;
+    }
+
+    if (
+      selectedPaymentAmount >
+        Number(totalAmount) +
+          0.000001
+    ) {
+      messageApi.error(
+        "Payment amount cannot exceed invoice total."
+      );
+
+      return;
+    }
+
     try {
       setLoading(true);
+
+      /* =====================================================
+         MAKE SURE PAYMENT IS SAVED BEFORE POSTING
+      ===================================================== */
+
+      await savePayment(
+        purchaseInvoiceId,
+        values
+      );
 
       const result =
         await postPurchaseInvoice(
@@ -1329,8 +1531,7 @@ export default function PurchaseInvoiceForm({
       );
 
       messageApi.error(
-        error?.response?.data
-          ?.message ||
+        error?.response?.data?.message ||
           error?.message ||
           "Failed to post purchase invoice."
       );
@@ -1339,9 +1540,9 @@ export default function PurchaseInvoiceForm({
     }
   }
 
-  /* ============================================================
-     TABLE COLUMNS
-     ============================================================ */
+  /* =========================================================
+     ITEM COLUMNS
+  ========================================================= */
 
   const itemColumns = [
     {
@@ -1353,13 +1554,13 @@ export default function PurchaseInvoiceForm({
         _,
         __,
         index
-      ) => index + 1,
+      ) =>
+        index + 1,
     },
 
     {
       title: "Product",
-      dataIndex:
-        "productId",
+      dataIndex: "productId",
       width: 320,
 
       render: (
@@ -1377,9 +1578,7 @@ export default function PurchaseInvoiceForm({
           style={{
             width: "100%",
           }}
-          onChange={(
-            newValue
-          ) =>
+          onChange={(newValue) =>
             updateItem(
               record.key,
               "productId",
@@ -1392,8 +1591,7 @@ export default function PurchaseInvoiceForm({
 
     {
       title: "Qty",
-      dataIndex:
-        "quantity",
+      dataIndex: "quantity",
       width: 120,
 
       render: (
@@ -1407,9 +1605,7 @@ export default function PurchaseInvoiceForm({
           style={{
             width: "100%",
           }}
-          onChange={(
-            newValue
-          ) =>
+          onChange={(newValue) =>
             updateItem(
               record.key,
               "quantity",
@@ -1422,8 +1618,7 @@ export default function PurchaseInvoiceForm({
 
     {
       title: "Unit Cost",
-      dataIndex:
-        "unitCost",
+      dataIndex: "unitCost",
       width: 150,
 
       render: (
@@ -1437,9 +1632,7 @@ export default function PurchaseInvoiceForm({
           style={{
             width: "100%",
           }}
-          onChange={(
-            newValue
-          ) =>
+          onChange={(newValue) =>
             updateItem(
               record.key,
               "unitCost",
@@ -1452,8 +1645,7 @@ export default function PurchaseInvoiceForm({
 
     {
       title: "Sale Price",
-      dataIndex:
-        "salePrice",
+      dataIndex: "salePrice",
       width: 150,
 
       render: (
@@ -1467,9 +1659,7 @@ export default function PurchaseInvoiceForm({
           style={{
             width: "100%",
           }}
-          onChange={(
-            newValue
-          ) =>
+          onChange={(newValue) =>
             updateItem(
               record.key,
               "salePrice",
@@ -1482,8 +1672,7 @@ export default function PurchaseInvoiceForm({
 
     {
       title: "Discount",
-      dataIndex:
-        "discountAmount",
+      dataIndex: "discountAmount",
       width: 130,
 
       render: (
@@ -1497,9 +1686,7 @@ export default function PurchaseInvoiceForm({
           style={{
             width: "100%",
           }}
-          onChange={(
-            newValue
-          ) =>
+          onChange={(newValue) =>
             updateItem(
               record.key,
               "discountAmount",
@@ -1512,8 +1699,7 @@ export default function PurchaseInvoiceForm({
 
     {
       title: "Tax",
-      dataIndex:
-        "taxAmount",
+      dataIndex: "taxAmount",
       width: 130,
 
       render: (
@@ -1527,9 +1713,7 @@ export default function PurchaseInvoiceForm({
           style={{
             width: "100%",
           }}
-          onChange={(
-            newValue
-          ) =>
+          onChange={(newValue) =>
             updateItem(
               record.key,
               "taxAmount",
@@ -1542,8 +1726,7 @@ export default function PurchaseInvoiceForm({
 
     {
       title: "Total",
-      dataIndex:
-        "totalAmount",
+      dataIndex: "totalAmount",
       width: 150,
       align: "right",
 
@@ -1584,9 +1767,9 @@ export default function PurchaseInvoiceForm({
     },
   ];
 
-  /* ============================================================
+  /* =========================================================
      INITIAL LOADING
-     ============================================================ */
+  ========================================================= */
 
   if (initialLoading) {
     return (
@@ -1602,9 +1785,9 @@ export default function PurchaseInvoiceForm({
     );
   }
 
-  /* ============================================================
-     UI
-     ============================================================ */
+  /* =========================================================
+     RENDER
+  ========================================================= */
 
   return (
     <>
@@ -1644,9 +1827,7 @@ export default function PurchaseInvoiceForm({
               )}
           </div>
 
-          <Space
-            orientation="horizontal"
-          >
+          <Space orientation="horizontal">
             {isEditMode && (
               <Button
                 disabled
@@ -1670,11 +1851,12 @@ export default function PurchaseInvoiceForm({
           layout="vertical"
           initialValues={{
             invoiceNumber: "",
-            invoiceDate:
-              dayjs(),
+            invoiceDate: dayjs(),
             exchangeRate: 1,
             discountAmount: 0,
             taxAmount: 0,
+            paymentAmount: 0,
+            paymentReference: "",
           }}
           onFinish={() =>
             handleSave()
@@ -1691,15 +1873,12 @@ export default function PurchaseInvoiceForm({
             }
           }}
         >
-          <Row gutter={16}>
-            {/* ==================================================
-                VOUCHER NUMBER
-                ================================================== */}
+          {/* =================================================
+              HEADER
+          ================================================= */}
 
-            <Col
-              xs={24}
-              md={8}
-            >
+          <Row gutter={16}>
+            <Col xs={24} md={8}>
               <Form.Item
                 label="Voucher No"
                 name="invoiceNumber"
@@ -1715,14 +1894,7 @@ export default function PurchaseInvoiceForm({
               </Form.Item>
             </Col>
 
-            {/* ==================================================
-                DATE
-                ================================================== */}
-
-            <Col
-              xs={24}
-              md={8}
-            >
+            <Col xs={24} md={8}>
               <Form.Item
                 label="Invoice Date"
                 name="invoiceDate"
@@ -1743,14 +1915,7 @@ export default function PurchaseInvoiceForm({
               </Form.Item>
             </Col>
 
-            {/* ==================================================
-                SUPPLIER
-                ================================================== */}
-
-            <Col
-              xs={24}
-              md={8}
-            >
+            <Col xs={24} md={8}>
               <Form.Item
                 label="Supplier"
                 name="supplierId"
@@ -1768,15 +1933,12 @@ export default function PurchaseInvoiceForm({
             </Col>
           </Row>
 
-          <Row gutter={16}>
-            {/* ==================================================
-                WAREHOUSE
-                ================================================== */}
+          {/* =================================================
+              WAREHOUSE / CURRENCY
+          ================================================= */}
 
-            <Col
-              xs={24}
-              md={8}
-            >
+          <Row gutter={16}>
+            <Col xs={24} md={8}>
               <Form.Item
                 label="Warehouse"
                 name="warehouseId"
@@ -1799,14 +1961,7 @@ export default function PurchaseInvoiceForm({
               </Form.Item>
             </Col>
 
-            {/* ==================================================
-                CURRENCY
-                ================================================== */}
-
-            <Col
-              xs={24}
-              md={8}
-            >
+            <Col xs={24} md={8}>
               <Form.Item
                 label="Currency"
                 name="currencyId"
@@ -1829,14 +1984,7 @@ export default function PurchaseInvoiceForm({
               </Form.Item>
             </Col>
 
-            {/* ==================================================
-                EXCHANGE RATE
-                ================================================== */}
-
-            <Col
-              xs={24}
-              md={8}
-            >
+            <Col xs={24} md={8}>
               <Form.Item
                 label="Exchange Rate"
                 name="exchangeRate"
@@ -1861,9 +2009,9 @@ export default function PurchaseInvoiceForm({
 
           <Divider />
 
-          {/* ====================================================
+          {/* =================================================
               PURCHASE ITEMS
-              ==================================================== */}
+          ================================================= */}
 
           <Space
             orientation="horizontal"
@@ -1906,15 +2054,12 @@ export default function PurchaseInvoiceForm({
 
           <Divider />
 
-          {/* ====================================================
-              NOTES + TOTAL
-              ==================================================== */}
+          {/* =================================================
+              NOTES / TOTAL / PAYMENT
+          ================================================= */}
 
           <Row gutter={24}>
-            <Col
-              xs={24}
-              md={12}
-            >
+            <Col xs={24} md={12}>
               <Form.Item
                 label="Notes"
                 name="notes"
@@ -1926,10 +2071,7 @@ export default function PurchaseInvoiceForm({
               </Form.Item>
             </Col>
 
-            <Col
-              xs={24}
-              md={12}
-            >
+            <Col xs={24} md={12}>
               <Card
                 size="small"
                 style={{
@@ -2020,9 +2162,138 @@ export default function PurchaseInvoiceForm({
 
           <Divider />
 
-          {/* ====================================================
+          {/* =================================================
+              PAYMENT
+          ================================================= */}
+
+          <Card
+            size="small"
+            title="Payment"
+            style={{
+              marginBottom: 24,
+            }}
+          >
+            <Row gutter={16}>
+              <Col xs={24} md={8}>
+                <Form.Item
+                  label="Payment Method"
+                  name="paymentMethodId"
+                  rules={[
+                    {
+                      required: true,
+                      message:
+                        "Please select payment method.",
+                    },
+                  ]}
+                >
+                  <Select
+                    showSearch
+                    optionFilterProp="label"
+                    placeholder="Select payment method"
+                    options={
+                      paymentMethodOptions
+                    }
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col xs={24} md={8}>
+                <Form.Item
+                  label="Paid Amount"
+                  name="paymentAmount"
+                  rules={[
+                    {
+                      required: true,
+                      message:
+                        "Please enter paid amount.",
+                    },
+                    {
+                      validator:
+                        async (
+                          _,
+                          value
+                        ) => {
+                          const amount =
+                            Number(
+                              value
+                            );
+
+                          if (
+                            !Number.isFinite(
+                              amount
+                            ) ||
+                            amount <= 0
+                          ) {
+                            throw new Error(
+                              "Paid amount must be greater than 0."
+                            );
+                          }
+
+                          if (
+                            amount >
+                            Number(
+                              totalAmount
+                            ) +
+                              0.000001
+                          ) {
+                            throw new Error(
+                              "Paid amount cannot exceed invoice total."
+                            );
+                          }
+                        },
+                    },
+                  ]}
+                >
+                  <InputNumber
+                    min={0}
+                    precision={4}
+                    style={{
+                      width: "100%",
+                    }}
+                    onChange={() =>
+                      setPaymentAmountTouched(
+                        true
+                      )
+                    }
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col xs={24} md={8}>
+                <Form.Item
+                  label="Reference Number"
+                  name="paymentReference"
+                >
+                  <Input
+                    placeholder="Reference / cheque / transaction no."
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Row
+              justify="end"
+            >
+              <Text type="secondary">
+                Payment:{" "}
+                {Number(
+                  paymentAmount
+                ).toLocaleString(
+                  undefined,
+                  {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  }
+                )}
+              </Text>
+            </Row>
+          </Card>
+
+          <Divider />
+
+          {/* =================================================
               BUTTONS
-              ==================================================== */}
+          ================================================= */}
 
           <Space
             orientation="horizontal"
@@ -2038,10 +2309,6 @@ export default function PurchaseInvoiceForm({
             >
               Cancel
             </Button>
-
-            {/* ==================================================
-                NEW PURCHASE
-                ================================================== */}
 
             {!isEditMode && (
               <Button
@@ -2067,10 +2334,6 @@ export default function PurchaseInvoiceForm({
               </Button>
             )}
 
-            {/* ==================================================
-                EDIT PURCHASE
-                ================================================== */}
-
             {isEditMode && (
               <Button
                 type="primary"
@@ -2085,10 +2348,6 @@ export default function PurchaseInvoiceForm({
                 Update
               </Button>
             )}
-
-            {/* ==================================================
-                POST / RECEIVE
-                ================================================== */}
 
             {isEditMode &&
               Number(

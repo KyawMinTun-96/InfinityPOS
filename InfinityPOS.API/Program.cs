@@ -1,17 +1,24 @@
 using System.Text;
 using InfinityPOS.API.Data;
+using InfinityPOS.API.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// =========================
+// DATABASE
+// =========================
 builder.Services.AddDbContext<InfinityPosDbContext>(options =>
     options.UseSqlServer(
         builder.Configuration.GetConnectionString("InfinityPOS")
     )
 );
 
+// =========================
+// JWT AUTHENTICATION
+// =========================
 var jwtKey = builder.Configuration["Jwt:Key"]
     ?? throw new InvalidOperationException("JWT Key is not configured.");
 
@@ -45,8 +52,15 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
+// =========================
+// CONTROLLERS
+// =========================
 builder.Services.AddControllers();
-builder.Services.AddOpenApi();
+
+// =========================
+// AUTOMATIC CASH SESSION CLOSE
+// =========================
+builder.Services.AddHostedService<CashAutoCloseService>();
 
 // =========================
 // CORS
@@ -62,14 +76,11 @@ builder.Services.AddCors(options =>
     });
 });
 
+// =========================
+// BUILD APPLICATION
+// =========================
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-}
-
-// CORS must be before Authentication / Authorization
 app.UseCors("AllowFrontend");
 
 app.UseHttpsRedirection();

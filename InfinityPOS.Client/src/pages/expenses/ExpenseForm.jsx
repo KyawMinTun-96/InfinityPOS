@@ -13,6 +13,7 @@ import {
   Typography,
   message,
 } from "antd";
+
 import {
   DeleteOutlined,
   PlusOutlined,
@@ -20,14 +21,16 @@ import {
   CheckOutlined,
   CloseOutlined,
 } from "@ant-design/icons";
+
 import dayjs from "dayjs";
+
 import {
-  useCallback,
   useEffect,
   useState,
 } from "react";
 
 import apiClient from "../../api/apiClient";
+
 import {
   createExpense,
   getExpenseDetails,
@@ -45,68 +48,112 @@ export default function ExpenseForm({
   onSaved,
 }) {
   const [form] = Form.useForm();
+
   const [messageApi, contextHolder] =
     message.useMessage();
 
-  const [accounts, setAccounts] = useState([]);
-  const [currencies, setCurrencies] = useState([]);
+  const [paymentAccounts, setPaymentAccounts] =
+    useState([]);
 
-  const [loading, setLoading] = useState(false);
+  const [expenseAccounts, setExpenseAccounts] =
+    useState([]);
+
+  const [currencies, setCurrencies] =
+    useState([]);
+
+  const [loading, setLoading] =
+    useState(false);
+
   const [lookupLoading, setLookupLoading] =
     useState(false);
 
-  const [voucherNo, setVoucherNo] = useState("");
+  const [voucherNo, setVoucherNo] =
+    useState("");
+
   const [status, setStatus] =
     useState("DRAFT");
 
-  const [items, setItems] = useState([]);
+  const [items, setItems] =
+    useState([]);
 
   const isEdit = Boolean(expenseId);
 
   /*
    * ============================================================
-   * LOAD LOOKUPS
+   * LOAD ACCOUNTS AND CURRENCIES
    * ============================================================
    */
 
-  const loadLookups = useCallback(async () => {
-    try {
-      setLookupLoading(true);
+  useEffect(() => {
+    let cancelled = false;
 
-      const [
-        accountsResponse,
-        currenciesResponse,
-      ] = await Promise.all([
-        apiClient.get("/accounts", {
-          params: {
-            isActive: true,
-          },
-        }),
+    async function fetchLookups() {
+      try {
+        setLookupLoading(true);
 
-        apiClient.get("/currencies", {
-          params: {
-            isActive: true,
-          },
-        }),
-      ]);
+        const [
+          paymentAccountsResponse,
+          expenseAccountsResponse,
+          currenciesResponse,
+        ] = await Promise.all([
+          apiClient.get("/accounts", {
+            params: {
+              isActive: true,
+              purpose: "payment",
+            },
+          }),
 
-      setAccounts(
-        accountsResponse.data || []
-      );
+          apiClient.get("/accounts", {
+            params: {
+              isActive: true,
+              purpose: "expense",
+            },
+          }),
 
-      setCurrencies(
-        currenciesResponse.data || []
-      );
-    } catch (error) {
-      console.error(error);
+          apiClient.get("/currencies", {
+            params: {
+              isActive: true,
+            },
+          }),
+        ]);
 
-      messageApi.error(
-        error?.response?.data?.message ||
-          "Failed to load accounts and currencies."
-      );
-    } finally {
-      setLookupLoading(false);
+        if (cancelled) return;
+
+        setPaymentAccounts(
+          paymentAccountsResponse.data || []
+        );
+
+        setExpenseAccounts(
+          expenseAccountsResponse.data || []
+        );
+
+        setCurrencies(
+          currenciesResponse.data || []
+        );
+      } catch (error) {
+        if (cancelled) return;
+
+        console.error(error);
+
+        messageApi.error(
+          error?.response?.data?.message ||
+            "Failed to load accounts and currencies."
+        );
+      } finally {
+        if (!cancelled) {
+          setLookupLoading(false);
+        }
+      }
     }
+
+    const timer = setTimeout(() => {
+      fetchLookups();
+    }, 0);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [messageApi]);
 
   /*
@@ -115,7 +162,7 @@ export default function ExpenseForm({
    * ============================================================
    */
 
-  const resetNewForm = useCallback(() => {
+  function resetNewForm() {
     form.resetFields();
 
     form.setFieldsValue({
@@ -130,109 +177,7 @@ export default function ExpenseForm({
     setVoucherNo("");
     setStatus("DRAFT");
     setItems([]);
-  }, [form]);
-
-  /*
-   * ============================================================
-   * LOAD EXISTING EXPENSE
-   * ============================================================
-   */
-
-  const loadExpense = useCallback(
-    async (id) => {
-      try {
-        setLoading(true);
-
-        const response =
-          await getExpenseDetails(id);
-
-        const expense =
-          response?.expense;
-
-        const expenseItems =
-          response?.items || [];
-
-        if (!expense) {
-          throw new Error(
-            "Expense data not found."
-          );
-        }
-
-        setVoucherNo(
-          expense.expenseNumber || ""
-        );
-
-        setStatus(
-          expense.statusCode ||
-            "DRAFT"
-        );
-
-        form.setFieldsValue({
-          expenseDate:
-            expense.expenseDate
-              ? dayjs(
-                  expense.expenseDate
-                )
-              : dayjs(),
-
-          payeeName:
-            expense.payeeName || "",
-
-          currencyId:
-            expense.currencyId > 0
-              ? expense.currencyId
-              : undefined,
-
-          exchangeRate:
-            expense.exchangeRate > 0
-              ? expense.exchangeRate
-              : 1,
-
-          paymentAccountId:
-            expense.paymentAccountId ||
-            undefined,
-
-          notes:
-            expense.notes || "",
-        });
-
-        setItems(
-          expenseItems.map(
-            (item, index) => ({
-              key:
-                item.expenseItemId ||
-                `existing-${index}-${Date.now()}`,
-
-              expenseItemId:
-                item.expenseItemId,
-
-              accountId:
-                item.accountId,
-
-              description:
-                item.description || "",
-
-              amount:
-                Number(
-                  item.amount || 0
-                ),
-            })
-          )
-        );
-      } catch (error) {
-        console.error(error);
-
-        messageApi.error(
-          error?.response?.data?.message ||
-            error?.message ||
-            "Failed to load expense."
-        );
-      } finally {
-        setLoading(false);
-      }
-    },
-    [form, messageApi]
-  );
+  }
 
   /*
    * ============================================================
@@ -273,11 +218,7 @@ export default function ExpenseForm({
    * ============================================================
    */
 
-  function updateItem(
-    key,
-    field,
-    value
-  ) {
+  function updateItem(key, field, value) {
     setItems((currentItems) =>
       currentItems.map((item) =>
         item.key === key
@@ -292,119 +233,155 @@ export default function ExpenseForm({
 
   /*
    * ============================================================
-   * TOTAL
+   * TOTAL AMOUNT
    * ============================================================
    */
 
   const totalAmount = items.reduce(
     (sum, item) =>
-      sum +
-      Number(item.amount || 0),
+      sum + Number(item.amount || 0),
     0
   );
 
   /*
    * ============================================================
-   * SAVE
+   * VALIDATE AND BUILD PAYLOAD
+   * ============================================================
+   */
+
+  async function buildPayload() {
+    const values = await form.validateFields();
+
+    if (!values.paymentAccountId) {
+      messageApi.warning(
+        "Please select payment account."
+      );
+
+      return null;
+    }
+
+    const validPaymentAccount =
+      paymentAccounts.some(
+        (account) =>
+          Number(account.accountId) ===
+          Number(values.paymentAccountId)
+      );
+
+    if (!validPaymentAccount) {
+      messageApi.error(
+        "Please select a valid payment account."
+      );
+
+      return null;
+    }
+
+    if (!values.currencyId) {
+      messageApi.warning(
+        "Please select currency."
+      );
+
+      return null;
+    }
+
+    if (items.length === 0) {
+      messageApi.warning(
+        "Please add at least one expense item."
+      );
+
+      return null;
+    }
+
+    const invalidAccount = items.some(
+      (item) =>
+        !item.accountId ||
+        !expenseAccounts.some(
+          (account) =>
+            Number(account.accountId) ===
+            Number(item.accountId)
+        )
+    );
+
+    if (invalidAccount) {
+      messageApi.warning(
+        "Please select a valid expense account for every item."
+      );
+
+      return null;
+    }
+
+    const invalidAmount = items.some(
+      (item) =>
+        Number(item.amount || 0) <= 0
+    );
+
+    if (invalidAmount) {
+      messageApi.warning(
+        "Every expense item amount must be greater than zero."
+      );
+
+      return null;
+    }
+
+    return {
+      expenseDate: values.expenseDate
+        ? values.expenseDate.toISOString()
+        : new Date().toISOString(),
+
+      payeeName:
+        values.payeeName || null,
+
+      currencyId:
+        values.currencyId,
+
+      exchangeRate:
+        Number(values.exchangeRate || 1),
+
+      paymentAccountId:
+        values.paymentAccountId,
+
+      totalAmount,
+
+      notes:
+        values.notes || null,
+
+      items: items.map((item) => ({
+        accountId:
+          item.accountId,
+
+        description:
+          item.description || null,
+
+        amount:
+          Number(item.amount || 0),
+      })),
+    };
+  }
+
+  /*
+   * ============================================================
+   * SAVE EXPENSE
    * ============================================================
    */
 
   async function handleSave() {
     try {
-      const values =
-        await form.validateFields();
+      const payload = await buildPayload();
 
-      if (items.length === 0) {
-        messageApi.warning(
-          "Please add at least one expense item."
-        );
-        return;
-      }
-
-      const invalidAccount =
-        items.some(
-          (item) => !item.accountId
-        );
-
-      if (invalidAccount) {
-        messageApi.warning(
-          "Please select an account for every expense item."
-        );
-        return;
-      }
-
-      const invalidAmount =
-        items.some(
-          (item) =>
-            Number(
-              item.amount || 0
-            ) <= 0
-        );
-
-      if (invalidAmount) {
-        messageApi.warning(
-          "Every expense item amount must be greater than zero."
-        );
-        return;
-      }
-
-      const payload = {
-        expenseDate:
-          values.expenseDate
-            ? values.expenseDate.toISOString()
-            : new Date().toISOString(),
-
-        payeeName:
-          values.payeeName || null,
-
-        currencyId:
-          values.currencyId,
-
-        exchangeRate:
-          Number(
-            values.exchangeRate || 1
-          ),
-
-        paymentAccountId:
-          values.paymentAccountId,
-
-        totalAmount,
-
-        notes:
-          values.notes || null,
-
-        items: items.map(
-          (item) => ({
-            accountId:
-              item.accountId,
-
-            description:
-              item.description ||
-              null,
-
-            amount:
-              Number(
-                item.amount || 0
-              ),
-          })
-        ),
-      };
+      if (!payload) return;
 
       setLoading(true);
 
       let savedExpense;
 
       if (isEdit) {
-        savedExpense =
-          await updateExpense(
-            expenseId,
-            payload
-          );
+        savedExpense = await updateExpense(
+          expenseId,
+          payload
+        );
       } else {
-        savedExpense =
-          await createExpense(
-            payload
-          );
+        savedExpense = await createExpense(
+          payload
+        );
       }
 
       const savedVoucher =
@@ -413,9 +390,7 @@ export default function ExpenseForm({
         "";
 
       if (savedVoucher) {
-        setVoucherNo(
-          savedVoucher
-        );
+        setVoucherNo(savedVoucher);
       }
 
       messageApi.success(
@@ -430,9 +405,7 @@ export default function ExpenseForm({
     } catch (error) {
       console.error(error);
 
-      if (error?.errorFields) {
-        return;
-      }
+      if (error?.errorFields) return;
 
       messageApi.error(
         error?.response?.data?.message ||
@@ -446,7 +419,7 @@ export default function ExpenseForm({
 
   /*
    * ============================================================
-   * POST
+   * POST EXPENSE
    * ============================================================
    */
 
@@ -455,88 +428,14 @@ export default function ExpenseForm({
       messageApi.warning(
         "Please save the expense before posting."
       );
+
       return;
     }
 
     try {
-      const values =
-        await form.validateFields();
+      const payload = await buildPayload();
 
-      if (items.length === 0) {
-        messageApi.warning(
-          "Please add at least one expense item."
-        );
-        return;
-      }
-
-      const invalidAccount =
-        items.some(
-          (item) => !item.accountId
-        );
-
-      if (invalidAccount) {
-        messageApi.warning(
-          "Please select an account for every expense item."
-        );
-        return;
-      }
-
-      const invalidAmount =
-        items.some(
-          (item) =>
-            Number(
-              item.amount || 0
-            ) <= 0
-        );
-
-      if (invalidAmount) {
-        messageApi.warning(
-          "Every expense item amount must be greater than zero."
-        );
-        return;
-      }
-
-      const payload = {
-        expenseDate:
-          values.expenseDate
-            ? values.expenseDate.toISOString()
-            : new Date().toISOString(),
-
-        payeeName:
-          values.payeeName || null,
-
-        currencyId:
-          values.currencyId,
-
-        exchangeRate:
-          Number(
-            values.exchangeRate || 1
-          ),
-
-        paymentAccountId:
-          values.paymentAccountId,
-
-        totalAmount,
-
-        notes:
-          values.notes || null,
-
-        items: items.map(
-          (item) => ({
-            accountId:
-              item.accountId,
-
-            description:
-              item.description ||
-              null,
-
-            amount:
-              Number(
-                item.amount || 0
-              ),
-          })
-        ),
-      };
+      if (!payload) return;
 
       setLoading(true);
 
@@ -546,9 +445,7 @@ export default function ExpenseForm({
       );
 
       const postedExpense =
-        await postExpense(
-          expenseId
-        );
+        await postExpense(expenseId);
 
       setStatus("POSTED");
 
@@ -562,9 +459,7 @@ export default function ExpenseForm({
     } catch (error) {
       console.error(error);
 
-      if (error?.errorFields) {
-        return;
-      }
+      if (error?.errorFields) return;
 
       messageApi.error(
         error?.response?.data?.message ||
@@ -584,16 +479,17 @@ export default function ExpenseForm({
 
   async function handleCancelExpense() {
     if (!expenseId) {
-      onCancel?.();
+      if (onCancel) {
+        onCancel();
+      }
+
       return;
     }
 
     try {
       setLoading(true);
 
-      await cancelExpense(
-        expenseId
-      );
+      await cancelExpense(expenseId);
 
       messageApi.success(
         "Expense cancelled successfully."
@@ -617,47 +513,115 @@ export default function ExpenseForm({
 
   /*
    * ============================================================
-   * EFFECT - LOOKUPS
+   * LOAD NEW / EXISTING EXPENSE
    * ============================================================
    */
 
   useEffect(() => {
-    const timer =
-      setTimeout(() => {
-        loadLookups();
-      }, 0);
+    let cancelled = false;
 
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [loadLookups]);
+    async function initializeForm() {
+      if (!expenseId) {
+        resetNewForm();
+        return;
+      }
 
-  /*
-   * ============================================================
-   * EFFECT - NEW / EDIT
-   * ============================================================
-   */
+      try {
+        setLoading(true);
 
-  useEffect(() => {
-    const timer =
-      setTimeout(() => {
-        if (expenseId) {
-          loadExpense(
-            expenseId
+        const response =
+          await getExpenseDetails(expenseId);
+
+        if (cancelled) return;
+
+        const expense =
+          response?.expense;
+
+        const expenseItems =
+          response?.items || [];
+
+        if (!expense) {
+          throw new Error(
+            "Expense data not found."
           );
-        } else {
-          resetNewForm();
         }
-      }, 0);
+
+        setVoucherNo(
+          expense.expenseNumber || ""
+        );
+
+        setStatus(
+          expense.statusCode || "DRAFT"
+        );
+
+        form.setFieldsValue({
+          expenseDate: expense.expenseDate
+            ? dayjs(expense.expenseDate)
+            : dayjs(),
+
+          payeeName:
+            expense.payeeName || "",
+
+          currencyId:
+            expense.currencyId || undefined,
+
+          exchangeRate:
+            expense.exchangeRate > 0
+              ? expense.exchangeRate
+              : 1,
+
+          paymentAccountId:
+            expense.paymentAccountId || undefined,
+
+          notes:
+            expense.notes || "",
+        });
+
+        setItems(
+          expenseItems.map((item, index) => ({
+            key:
+              item.expenseItemId ||
+              `existing-${index}`,
+
+            expenseItemId:
+              item.expenseItemId,
+
+            accountId:
+              item.accountId,
+
+            description:
+              item.description || "",
+
+            amount:
+              Number(item.amount || 0),
+          }))
+        );
+      } catch (error) {
+        if (cancelled) return;
+
+        console.error(error);
+
+        messageApi.error(
+          error?.response?.data?.message ||
+            error?.message ||
+            "Failed to load expense."
+        );
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    const timer = setTimeout(() => {
+      initializeForm();
+    }, 0);
 
     return () => {
+      cancelled = true;
       clearTimeout(timer);
     };
-  }, [
-    expenseId,
-    loadExpense,
-    resetNewForm,
-  ]);
+  }, [expenseId, form, messageApi]);
 
   /*
    * ============================================================
@@ -671,11 +635,8 @@ export default function ExpenseForm({
       width: 60,
       align: "center",
 
-      render: (
-        _,
-        __,
-        index
-      ) => index + 1,
+      render: (_, __, index) =>
+        index + 1,
     },
 
     {
@@ -683,37 +644,24 @@ export default function ExpenseForm({
       dataIndex: "accountId",
       width: 300,
 
-      render: (
-        value,
-        record
-      ) => (
+      render: (value, record) => (
         <Select
           showSearch
           allowClear
-          placeholder="Select account"
+          placeholder="Select expense account"
           value={value}
-          loading={
-            lookupLoading
-          }
-          disabled={
-            status !== "DRAFT"
-          }
-          style={{
-            width: "100%",
-          }}
+          loading={lookupLoading}
+          disabled={status !== "DRAFT"}
+          style={{ width: "100%" }}
           optionFilterProp="label"
-          options={accounts.map(
+          options={expenseAccounts.map(
             (account) => ({
-              value:
-                account.accountId,
-
+              value: account.accountId,
               label:
                 `${account.accountCode} - ${account.accountName}`,
             })
           )}
-          onChange={(
-            newValue
-          ) =>
+          onChange={(newValue) =>
             updateItem(
               record.key,
               "accountId",
@@ -729,19 +677,12 @@ export default function ExpenseForm({
       dataIndex: "description",
       width: 380,
 
-      render: (
-        value,
-        record
-      ) => (
+      render: (value, record) => (
         <Input
           value={value}
-          disabled={
-            status !== "DRAFT"
-          }
+          disabled={status !== "DRAFT"}
           placeholder="Description"
-          onChange={(
-            event
-          ) =>
+          onChange={(event) =>
             updateItem(
               record.key,
               "description",
@@ -758,29 +699,18 @@ export default function ExpenseForm({
       width: 180,
       align: "right",
 
-      render: (
-        value,
-        record
-      ) => (
+      render: (value, record) => (
         <InputNumber
           value={value}
           min={0}
           precision={2}
-          disabled={
-            status !== "DRAFT"
-          }
-          style={{
-            width: "100%",
-          }}
-          onChange={(
-            newValue
-          ) =>
+          disabled={status !== "DRAFT"}
+          style={{ width: "100%" }}
+          onChange={(newValue) =>
             updateItem(
               record.key,
               "amount",
-              Number(
-                newValue || 0
-              )
+              Number(newValue || 0)
             )
           }
         />
@@ -792,37 +722,23 @@ export default function ExpenseForm({
       width: 80,
       align: "center",
 
-      render: (
-        _,
-        record
-      ) => (
+      render: (_, record) => (
         <Button
           danger
           type="text"
-          icon={
-            <DeleteOutlined />
-          }
-          disabled={
-            status !== "DRAFT"
-          }
+          icon={<DeleteOutlined />}
+          disabled={status !== "DRAFT"}
           onClick={() =>
-            removeItem(
-              record.key
-            )
+            removeItem(record.key)
           }
         />
       ),
     },
   ];
 
-  const isDraft =
-    status === "DRAFT";
-
-  const isPosted =
-    status === "POSTED";
-
-  const isCancelled =
-    status === "CANCELLED";
+  const isDraft = status === "DRAFT";
+  const isPosted = status === "POSTED";
+  const isCancelled = status === "CANCELLED";
 
   /*
    * ============================================================
@@ -845,19 +761,15 @@ export default function ExpenseForm({
           style={{
             marginBottom: 20,
             display: "flex",
-            justifyContent:
-              "space-between",
-            alignItems:
-              "flex-start",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
             gap: 16,
           }}
         >
           <div>
             <Title
               level={2}
-              style={{
-                margin: 0,
-              }}
+              style={{ margin: 0 }}
             >
               {isEdit
                 ? "Edit Expense"
@@ -865,19 +777,14 @@ export default function ExpenseForm({
             </Title>
 
             <Text type="secondary">
-              Expense transaction
-              management
+              Expense transaction management
             </Text>
           </div>
 
           <Space>
             <Button
-              icon={
-                <CloseOutlined />
-              }
-              onClick={
-                onCancel
-              }
+              icon={<CloseOutlined />}
+              onClick={onCancel}
             >
               Back
             </Button>
@@ -886,15 +793,9 @@ export default function ExpenseForm({
               <>
                 <Button
                   type="primary"
-                  icon={
-                    <SaveOutlined />
-                  }
-                  loading={
-                    loading
-                  }
-                  onClick={
-                    handleSave
-                  }
+                  icon={<SaveOutlined />}
+                  loading={loading}
+                  onClick={handleSave}
                 >
                   Save Draft
                 </Button>
@@ -902,15 +803,9 @@ export default function ExpenseForm({
                 {isEdit && (
                   <Button
                     type="primary"
-                    icon={
-                      <CheckOutlined />
-                    }
-                    loading={
-                      loading
-                    }
-                    onClick={
-                      handlePost
-                    }
+                    icon={<CheckOutlined />}
+                    loading={loading}
+                    onClick={handlePost}
                   >
                     Post
                   </Button>
@@ -918,31 +813,22 @@ export default function ExpenseForm({
               </>
             )}
 
-            {isDraft &&
-              isEdit && (
-                <Button
-                  danger
-                  icon={
-                    <CloseOutlined />
-                  }
-                  loading={
-                    loading
-                  }
-                  onClick={
-                    handleCancelExpense
-                  }
-                >
-                  Cancel Expense
-                </Button>
-              )}
+            {isDraft && isEdit && (
+              <Button
+                danger
+                icon={<CloseOutlined />}
+                loading={loading}
+                onClick={handleCancelExpense}
+              >
+                Cancel Expense
+              </Button>
+            )}
           </Space>
         </div>
 
         <Card
           title="Expense Information"
-          style={{
-            marginBottom: 20,
-          }}
+          style={{ marginBottom: 20 }}
         >
           <Form
             form={form}
@@ -950,17 +836,10 @@ export default function ExpenseForm({
             requiredMark="optional"
           >
             <Row gutter={16}>
-              <Col
-                xs={24}
-                md={6}
-              >
-                <Form.Item
-                  label="Voucher No."
-                >
+              <Col xs={24} md={6}>
+                <Form.Item label="Voucher No.">
                   <Input
-                    value={
-                      voucherNo
-                    }
+                    value={voucherNo}
                     placeholder={
                       isEdit
                         ? "Loading..."
@@ -971,10 +850,7 @@ export default function ExpenseForm({
                 </Form.Item>
               </Col>
 
-              <Col
-                xs={24}
-                md={6}
-              >
+              <Col xs={24} md={6}>
                 <Form.Item
                   name="expenseDate"
                   label="Expense Date"
@@ -987,38 +863,26 @@ export default function ExpenseForm({
                   ]}
                 >
                   <DatePicker
-                    style={{
-                      width: "100%",
-                    }}
-                    disabled={
-                      !isDraft
-                    }
+                    style={{ width: "100%" }}
+                    disabled={!isDraft}
                     format="DD/MM/YYYY"
                   />
                 </Form.Item>
               </Col>
 
-              <Col
-                xs={24}
-                md={6}
-              >
+              <Col xs={24} md={6}>
                 <Form.Item
                   name="payeeName"
                   label="Payee Name"
                 >
                   <Input
-                    disabled={
-                      !isDraft
-                    }
+                    disabled={!isDraft}
                     placeholder="Enter payee name"
                   />
                 </Form.Item>
               </Col>
 
-              <Col
-                xs={24}
-                md={6}
-              >
+              <Col xs={24} md={6}>
                 <Form.Item
                   name="currencyId"
                   label="Currency"
@@ -1033,21 +897,13 @@ export default function ExpenseForm({
                   <Select
                     showSearch
                     allowClear
-                    loading={
-                      lookupLoading
-                    }
-                    disabled={
-                      !isDraft
-                    }
+                    loading={lookupLoading}
+                    disabled={!isDraft}
                     placeholder="Select currency"
                     optionFilterProp="label"
                     options={currencies.map(
-                      (
-                        currency
-                      ) => ({
-                        value:
-                          currency.currencyId,
-
+                      (currency) => ({
+                        value: currency.currencyId,
                         label:
                           `${currency.currencyCode} - ${currency.currencyName}`,
                       })
@@ -1058,10 +914,7 @@ export default function ExpenseForm({
             </Row>
 
             <Row gutter={16}>
-              <Col
-                xs={24}
-                md={6}
-              >
+              <Col xs={24} md={6}>
                 <Form.Item
                   name="exchangeRate"
                   label="Exchange Rate"
@@ -1074,24 +927,15 @@ export default function ExpenseForm({
                   ]}
                 >
                   <InputNumber
-                    min={
-                      0.000001
-                    }
+                    min={0.000001}
                     precision={6}
-                    disabled={
-                      !isDraft
-                    }
-                    style={{
-                      width: "100%",
-                    }}
+                    disabled={!isDraft}
+                    style={{ width: "100%" }}
                   />
                 </Form.Item>
               </Col>
 
-              <Col
-                xs={24}
-                md={10}
-              >
+              <Col xs={24} md={10}>
                 <Form.Item
                   name="paymentAccountId"
                   label="Payment Account"
@@ -1106,21 +950,13 @@ export default function ExpenseForm({
                   <Select
                     showSearch
                     allowClear
-                    loading={
-                      lookupLoading
-                    }
-                    disabled={
-                      !isDraft
-                    }
+                    loading={lookupLoading}
+                    disabled={!isDraft}
                     placeholder="Select payment account"
                     optionFilterProp="label"
-                    options={accounts.map(
-                      (
-                        account
-                      ) => ({
-                        value:
-                          account.accountId,
-
+                    options={paymentAccounts.map(
+                      (account) => ({
+                        value: account.accountId,
                         label:
                           `${account.accountCode} - ${account.accountName}`,
                       })
@@ -1129,19 +965,14 @@ export default function ExpenseForm({
                 </Form.Item>
               </Col>
 
-              <Col
-                xs={24}
-                md={8}
-              >
+              <Col xs={24} md={8}>
                 <Form.Item
                   name="notes"
                   label="Notes"
                 >
                   <TextArea
                     rows={1}
-                    disabled={
-                      !isDraft
-                    }
+                    disabled={!isDraft}
                     placeholder="Notes"
                   />
                 </Form.Item>
@@ -1156,34 +987,22 @@ export default function ExpenseForm({
             isDraft && (
               <Button
                 type="primary"
-                icon={
-                  <PlusOutlined />
-                }
-                onClick={
-                  addItem
-                }
+                icon={<PlusOutlined />}
+                onClick={addItem}
               >
                 Add Item
               </Button>
             )
           }
-          style={{
-            marginBottom: 20,
-          }}
+          style={{ marginBottom: 20 }}
         >
           <Table
             rowKey="key"
-            columns={
-              itemColumns
-            }
+            columns={itemColumns}
             dataSource={items}
             pagination={false}
-            loading={
-              loading
-            }
-            scroll={{
-              x: 1050,
-            }}
+            loading={loading}
+            scroll={{ x: 1050 }}
             locale={{
               emptyText:
                 "No expense items. Click Add Item.",
@@ -1194,23 +1013,18 @@ export default function ExpenseForm({
             style={{
               marginTop: 20,
               display: "flex",
-              justifyContent:
-                "flex-end",
+              justifyContent: "flex-end",
             }}
           >
             <Card
               size="small"
-              style={{
-                minWidth: 320,
-              }}
+              style={{ minWidth: 320 }}
             >
               <div
                 style={{
                   display: "flex",
-                  justifyContent:
-                    "space-between",
-                  alignItems:
-                    "center",
+                  justifyContent: "space-between",
+                  alignItems: "center",
                 }}
               >
                 <Text strong>
@@ -1219,9 +1033,7 @@ export default function ExpenseForm({
 
                 <Text
                   strong
-                  style={{
-                    fontSize: 20,
-                  }}
+                  style={{ fontSize: 20 }}
                 >
                   {totalAmount.toLocaleString(
                     undefined,
@@ -1239,14 +1051,11 @@ export default function ExpenseForm({
         {isPosted && (
           <Card
             size="small"
-            style={{
-              marginBottom: 20,
-            }}
+            style={{ marginBottom: 20 }}
           >
             <Text strong>
-              This expense has been
-              POSTED and can no
-              longer be edited.
+              This expense has been POSTED and
+              can no longer be edited.
             </Text>
           </Card>
         )}
@@ -1254,13 +1063,10 @@ export default function ExpenseForm({
         {isCancelled && (
           <Card
             size="small"
-            style={{
-              marginBottom: 20,
-            }}
+            style={{ marginBottom: 20 }}
           >
             <Text strong>
-              This expense has been
-              CANCELLED.
+              This expense has been CANCELLED.
             </Text>
           </Card>
         )}
