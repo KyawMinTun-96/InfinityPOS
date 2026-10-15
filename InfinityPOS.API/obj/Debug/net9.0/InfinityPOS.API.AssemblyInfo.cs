@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("InfinityPOS.API")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+1519f175c0f4c7e43a773764be4bd5d7abf25db7")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+810133b62a1df4134979b1805581e5836d771a46")]
 [assembly: System.Reflection.AssemblyProductAttribute("InfinityPOS.API")]
 [assembly: System.Reflection.AssemblyTitleAttribute("InfinityPOS.API")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

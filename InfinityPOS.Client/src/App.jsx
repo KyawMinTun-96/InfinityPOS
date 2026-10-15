@@ -12,6 +12,9 @@ import Expenses from "./pages/expenses/Expenses";
 import ExpenseForm from "./pages/expenses/ExpenseForm";
 
 import CashManagement from "./pages/CashManagement/CashManagement";
+import CustomReport from "./pages/reports/CustomReport";
+
+import ProfitLossReport from "./pages/reports/ProfitLossReport";
 
 import {
   Layout,
@@ -39,6 +42,7 @@ import {
   SettingOutlined,
   LogoutOutlined,
   WalletOutlined,
+  PieChartOutlined,
 } from "@ant-design/icons";
 
 import Login from "./pages/auth/Login";
@@ -53,112 +57,83 @@ const { Header, Sider, Content } = Layout;
 const { Title, Text } = Typography;
 
 function Dashboard({ user, onLogout }) {
-  const [selectedMenu, setSelectedMenu] =
-    useState("dashboard");
+  const [selectedMenu, setSelectedMenu] = useState("dashboard");
 
-  /* =========================
-     PURCHASE STATE
-  ========================= */
+  // PURCHASE STATE
+  const [purchasePage, setPurchasePage] = useState("list");
+  const [editingPurchaseId, setEditingPurchaseId] = useState(null);
 
-  const [purchasePage, setPurchasePage] =
-    useState("list");
+  // SALES STATE
+  const [salesPage, setSalesPage] = useState("list");
+  const [editingSalesId, setEditingSalesId] = useState(null);
 
-  const [editingPurchaseId, setEditingPurchaseId] =
-    useState(null);
+  // EXPENSE STATE
+  const [expensePage, setExpensePage] = useState("list");
+  const [editingExpenseId, setEditingExpenseId] = useState(null);
 
-  /* =========================
-     SALES STATE
-  ========================= */
-
-  const [salesPage, setSalesPage] =
-    useState("list");
-
-  const [editingSalesId, setEditingSalesId] =
-    useState(null);
-
-  /* =========================
-     EXPENSE STATE
-  ========================= */
-
-  const [expensePage, setExpensePage] =
-    useState("list");
-
-  const [editingExpenseId, setEditingExpenseId] =
-    useState(null);
-
-  /* =========================
-     MENU
-  ========================= */
-
+  // SIDEBAR MENU
   const menuItems = [
     {
       key: "dashboard",
       icon: <DashboardOutlined />,
       label: "Dashboard",
     },
-
     {
       key: "sales",
       icon: <ShoppingCartOutlined />,
       label: "Sales",
     },
-
     {
       key: "products",
       icon: <AppstoreOutlined />,
       label: "Products",
     },
-
     {
       key: "purchases",
       icon: <ShoppingOutlined />,
       label: "Purchases",
     },
-
     {
       key: "stock",
       icon: <DatabaseOutlined />,
       label: "Stock Balance",
     },
-
     {
       key: "customers",
       icon: <UserOutlined />,
       label: "Customers",
     },
-
     {
       key: "suppliers",
       icon: <TeamOutlined />,
       label: "Suppliers",
     },
-
     {
       key: "expenses",
       icon: <DollarOutlined />,
       label: "Expenses",
     },
-
-    /* =========================
-       CASH MANAGEMENT
-    ========================= */
-
     {
       key: "cash",
       icon: <WalletOutlined />,
       label: "Cash Management",
     },
-
     {
       key: "reports",
       icon: <BarChartOutlined />,
       label: "Reports",
     },
 
+    // NEW PROFIT & LOSS MENU
+    {
+      key: "profit-loss",
+      icon: <PieChartOutlined />,
+      label: "Profit & Loss",
+    },
+
     {
       type: "divider",
     },
-
     {
       key: "settings",
       icon: <SettingOutlined />,
@@ -175,20 +150,14 @@ function Dashboard({ user, onLogout }) {
     },
   ];
 
-  /* =========================
-     USER MENU
-  ========================= */
-
+  // USER MENU
   const handleUserMenuClick = ({ key }) => {
     if (key === "logout") {
       onLogout();
     }
   };
 
-  /* =========================
-     MAIN MENU
-  ========================= */
-
+  // MAIN MENU
   const handleMenuClick = ({ key }) => {
     setSelectedMenu(key);
 
@@ -208,22 +177,14 @@ function Dashboard({ user, onLogout }) {
     }
   };
 
-  /* =========================
-     PURCHASE HANDLERS
-  ========================= */
-
+  // PURCHASE HANDLERS
   function handleNewPurchase() {
     setEditingPurchaseId(null);
     setPurchasePage("form");
   }
 
-  function handleEditPurchase(
-    purchaseInvoiceId
-  ) {
-    setEditingPurchaseId(
-      purchaseInvoiceId
-    );
-
+  function handleEditPurchase(purchaseInvoiceId) {
+    setEditingPurchaseId(purchaseInvoiceId);
     setPurchasePage("edit");
   }
 
@@ -237,22 +198,14 @@ function Dashboard({ user, onLogout }) {
     setPurchasePage("list");
   }
 
-  /* =========================
-     SALES HANDLERS
-  ========================= */
-
+  // SALES HANDLERS
   function handleNewSale() {
     setEditingSalesId(null);
     setSalesPage("form");
   }
 
-  function handleEditSale(
-    salesInvoiceId
-  ) {
-    setEditingSalesId(
-      salesInvoiceId
-    );
-
+  function handleEditSale(salesInvoiceId) {
+    setEditingSalesId(salesInvoiceId);
     setSalesPage("edit");
   }
 
@@ -266,18 +219,13 @@ function Dashboard({ user, onLogout }) {
     setSalesPage("list");
   }
 
-  /* =========================
-     EXPENSE HANDLERS
-  ========================= */
-
+  // EXPENSE HANDLERS
   function handleNewExpense() {
     setEditingExpenseId(null);
     setExpensePage("form");
   }
 
-  function handleEditExpense(
-    expenseId
-  ) {
+  function handleEditExpense(expenseId) {
     setEditingExpenseId(expenseId);
     setExpensePage("edit");
   }
@@ -293,15 +241,8 @@ function Dashboard({ user, onLogout }) {
   }
 
   return (
-    <Layout
-      style={{
-        minHeight: "100vh",
-      }}
-    >
-      {/* =========================
-          SIDEBAR
-      ========================= */}
-
+    <Layout style={{ minHeight: "100vh" }}>
+      {/* SIDEBAR */}
       <Sider
         width={240}
         theme="light"
@@ -314,16 +255,12 @@ function Dashboard({ user, onLogout }) {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            borderBottom:
-              "1px solid #f0f0f0",
+            borderBottom: "1px solid #f0f0f0",
           }}
         >
           <Title
             level={3}
-            style={{
-              margin: 0,
-              color: "#1677ff",
-            }}
+            style={{ margin: 0, color: "#1677ff" }}
           >
             InfinityPOS
           </Title>
@@ -342,16 +279,12 @@ function Dashboard({ user, onLogout }) {
       </Sider>
 
       <Layout>
-        {/* =========================
-            HEADER
-        ========================= */}
-
+        {/* HEADER */}
         <Header
           style={{
             padding: "0 24px",
             background: "#ffffff",
-            borderBottom:
-              "1px solid #f0f0f0",
+            borderBottom: "1px solid #f0f0f0",
             display: "flex",
             alignItems: "center",
             justifyContent: "flex-end",
@@ -360,39 +293,22 @@ function Dashboard({ user, onLogout }) {
           <Dropdown
             menu={{
               items: userMenuItems,
-              onClick:
-                handleUserMenuClick,
+              onClick: handleUserMenuClick,
             }}
             placement="bottomRight"
           >
-            <Space
-              style={{
-                cursor: "pointer",
-              }}
-            >
+            <Space style={{ cursor: "pointer" }}>
               <Avatar
                 icon={<UserOutlined />}
-                style={{
-                  background: "#1677ff",
-                }}
+                style={{ background: "#1677ff" }}
               />
 
-              <div
-                style={{
-                  lineHeight: 1.2,
-                }}
-              >
-                <Text strong>
-                  {user?.displayName}
-                </Text>
-
+              <div style={{ lineHeight: 1.2 }}>
+                <Text strong>{user?.displayName}</Text>
                 <br />
-
                 <Text
                   type="secondary"
-                  style={{
-                    fontSize: 12,
-                  }}
+                  style={{ fontSize: 12 }}
                 >
                   {user?.roleName}
                 </Text>
@@ -401,48 +317,27 @@ function Dashboard({ user, onLogout }) {
           </Dropdown>
         </Header>
 
-        {/* =========================
-            CONTENT
-        ========================= */}
-
+        {/* CONTENT */}
         <Content
           style={{
             padding: 24,
             background: "#f5f7fa",
           }}
         >
-          {/* =========================
-              DASHBOARD
-          ========================= */}
-
+          {/* DASHBOARD */}
           {selectedMenu === "dashboard" && (
             <>
-              <div
-                style={{
-                  marginBottom: 24,
-                }}
-              >
-                <Title
-                  level={2}
-                  style={{
-                    marginBottom: 4,
-                  }}
-                >
+              <div style={{ marginBottom: 24 }}>
+                <Title level={2} style={{ marginBottom: 4 }}>
                   Dashboard
                 </Title>
-
                 <Text type="secondary">
-                  Welcome back,{" "}
-                  {user?.displayName}
+                  Welcome back, {user?.displayName}
                 </Text>
               </div>
 
               <Row gutter={[16, 16]}>
-                <Col
-                  xs={24}
-                  sm={12}
-                  lg={6}
-                >
+                <Col xs={24} sm={12} lg={6}>
                   <Card>
                     <Statistic
                       title="Today's Sales"
@@ -453,11 +348,7 @@ function Dashboard({ user, onLogout }) {
                   </Card>
                 </Col>
 
-                <Col
-                  xs={24}
-                  sm={12}
-                  lg={6}
-                >
+                <Col xs={24} sm={12} lg={6}>
                   <Card>
                     <Statistic
                       title="Today's Purchases"
@@ -468,11 +359,7 @@ function Dashboard({ user, onLogout }) {
                   </Card>
                 </Col>
 
-                <Col
-                  xs={24}
-                  sm={12}
-                  lg={6}
-                >
+                <Col xs={24} sm={12} lg={6}>
                   <Card>
                     <Statistic
                       title="Today's Expenses"
@@ -483,11 +370,7 @@ function Dashboard({ user, onLogout }) {
                   </Card>
                 </Col>
 
-                <Col
-                  xs={24}
-                  sm={12}
-                  lg={6}
-                >
+                <Col xs={24} sm={12} lg={6}>
                   <Card>
                     <Statistic
                       title="Stock Items"
@@ -499,94 +382,47 @@ function Dashboard({ user, onLogout }) {
 
               <Row
                 gutter={[16, 16]}
-                style={{
-                  marginTop: 16,
-                }}
+                style={{ marginTop: 16 }}
               >
-                <Col
-                  xs={24}
-                  lg={16}
-                >
+                <Col xs={24} lg={16}>
                   <Card title="Sales Overview">
                     <div
                       style={{
                         height: 280,
                         display: "flex",
-                        alignItems:
-                          "center",
-                        justifyContent:
-                          "center",
+                        alignItems: "center",
+                        justifyContent: "center",
                         color: "#999",
                       }}
                     >
-                      Sales chart will be
-                      connected to the API
-                      later.
+                      Sales chart will be connected to the API later.
                     </div>
                   </Card>
                 </Col>
 
-                <Col
-                  xs={24}
-                  lg={8}
-                >
+                <Col xs={24} lg={8}>
                   <Card title="Quick Summary">
                     <Space
-                      orientation="vertical"
+                      direction="vertical"
                       size="large"
-                      style={{
-                        width: "100%",
-                      }}
+                      style={{ width: "100%" }}
                     >
                       <div>
-                        <Text type="secondary">
-                          Total Customers
-                        </Text>
-
+                        <Text type="secondary">Total Customers</Text>
                         <br />
-
-                        <Text
-                          strong
-                          style={{
-                            fontSize: 24,
-                          }}
-                        >
-                          0
-                        </Text>
+                        <Text strong style={{ fontSize: 24 }}>0</Text>
                       </div>
 
                       <div>
-                        <Text type="secondary">
-                          Total Suppliers
-                        </Text>
-
+                        <Text type="secondary">Total Suppliers</Text>
                         <br />
-
-                        <Text
-                          strong
-                          style={{
-                            fontSize: 24,
-                          }}
-                        >
-                          0
-                        </Text>
+                        <Text strong style={{ fontSize: 24 }}>0</Text>
                       </div>
 
                       <div>
-                        <Text type="secondary">
-                          Low Stock Items
-                        </Text>
-
+                        <Text type="secondary">Low Stock Items</Text>
                         <br />
-
-                        <Text
-                          strong
-                          style={{
-                            fontSize: 24,
-                          }}
-                        >
-                          0
-                        </Text>
+                        <Text strong style={{ fontSize: 24 }}>0</Text>
                       </div>
                     </Space>
                   </Card>
@@ -595,32 +431,24 @@ function Dashboard({ user, onLogout }) {
 
               <Card
                 title="Recent Sales"
-                style={{
-                  marginTop: 16,
-                }}
+                style={{ marginTop: 16 }}
               >
                 <div
                   style={{
                     minHeight: 180,
                     display: "flex",
-                    alignItems:
-                      "center",
-                    justifyContent:
-                      "center",
+                    alignItems: "center",
+                    justifyContent: "center",
                     color: "#999",
                   }}
                 >
-                  Recent sales will appear
-                  here.
+                  Recent sales will appear here.
                 </div>
               </Card>
             </>
           )}
 
-          {/* =========================
-              SALES
-          ========================= */}
-
+          {/* SALES */}
           {selectedMenu === "sales" && (
             <>
               {salesPage === "list" && (
@@ -632,43 +460,25 @@ function Dashboard({ user, onLogout }) {
 
               {salesPage === "form" && (
                 <SalesInvoiceForm
-                  onCancel={
-                    handleSalesCancel
-                  }
-                  onSaved={
-                    handleSalesSaved
-                  }
+                  onCancel={handleSalesCancel}
+                  onSaved={handleSalesSaved}
                 />
               )}
 
               {salesPage === "edit" && (
                 <SalesInvoiceForm
-                  salesInvoiceId={
-                    editingSalesId
-                  }
-                  onCancel={
-                    handleSalesCancel
-                  }
-                  onSaved={
-                    handleSalesSaved
-                  }
+                  salesInvoiceId={editingSalesId}
+                  onCancel={handleSalesCancel}
+                  onSaved={handleSalesSaved}
                 />
               )}
             </>
           )}
 
-          {/* =========================
-              PRODUCTS
-          ========================= */}
+          {/* PRODUCTS */}
+          {selectedMenu === "products" && <Products />}
 
-          {selectedMenu === "products" && (
-            <Products />
-          )}
-
-          {/* =========================
-              PURCHASES
-          ========================= */}
-
+          {/* PURCHASES */}
           {selectedMenu === "purchases" && (
             <>
               {purchasePage === "list" && (
@@ -680,116 +490,81 @@ function Dashboard({ user, onLogout }) {
 
               {purchasePage === "form" && (
                 <PurchaseInvoiceForm
-                  onCancel={
-                    handlePurchaseCancel
-                  }
-                  onSaved={
-                    handlePurchaseSaved
-                  }
+                  onCancel={handlePurchaseCancel}
+                  onSaved={handlePurchaseSaved}
                 />
               )}
 
               {purchasePage === "edit" && (
                 <PurchaseInvoiceForm
-                  purchaseInvoiceId={
-                    editingPurchaseId
-                  }
-                  onCancel={
-                    handlePurchaseCancel
-                  }
-                  onSaved={
-                    handlePurchaseSaved
-                  }
+                  purchaseInvoiceId={editingPurchaseId}
+                  onCancel={handlePurchaseCancel}
+                  onSaved={handlePurchaseSaved}
                 />
               )}
             </>
           )}
 
-          {/* =========================
-              STOCK BALANCE
-          ========================= */}
+          {/* STOCK BALANCE */}
+          {selectedMenu === "stock" && <StockBalance />}
 
-          {selectedMenu === "stock" && (
-            <StockBalance />
-          )}
-
-          {/* =========================
-              EXPENSES
-          ========================= */}
-
+          {/* EXPENSES */}
           {selectedMenu === "expenses" && (
             <>
               {expensePage === "list" && (
                 <Expenses
-                  onNew={
-                    handleNewExpense
-                  }
-                  onEdit={
-                    handleEditExpense
-                  }
+                  onNew={handleNewExpense}
+                  onEdit={handleEditExpense}
                 />
               )}
 
               {expensePage === "form" && (
                 <ExpenseForm
-                  onCancel={
-                    handleExpenseCancel
-                  }
-                  onSaved={
-                    handleExpenseSaved
-                  }
+                  onCancel={handleExpenseCancel}
+                  onSaved={handleExpenseSaved}
                 />
               )}
 
               {expensePage === "edit" && (
                 <ExpenseForm
-                  expenseId={
-                    editingExpenseId
-                  }
-                  onCancel={
-                    handleExpenseCancel
-                  }
-                  onSaved={
-                    handleExpenseSaved
-                  }
+                  expenseId={editingExpenseId}
+                  onCancel={handleExpenseCancel}
+                  onSaved={handleExpenseSaved}
                 />
               )}
             </>
           )}
 
-          {/* =========================
-              CASH MANAGEMENT
-          ========================= */}
+          {/* CASH MANAGEMENT */}
+          {selectedMenu === "cash" && <CashManagement />}
 
-          {selectedMenu === "cash" && (
-            <CashManagement />
-          )}
+          {/* SALES REPORTS */}
+          {selectedMenu === "reports" && <CustomReport />}
 
-          {/* =========================
-              OTHER MODULES
-          ========================= */}
+          {/* PROFIT & LOSS */}
+          {selectedMenu === "profit-loss" && <ProfitLossReport />}
 
+          {/* OTHER MODULES */}
           {selectedMenu !== "dashboard" &&
             selectedMenu !== "sales" &&
             selectedMenu !== "products" &&
             selectedMenu !== "purchases" &&
             selectedMenu !== "stock" &&
             selectedMenu !== "expenses" &&
-            selectedMenu !== "cash" && (
+            selectedMenu !== "cash" &&
+            selectedMenu !== "reports" &&
+            selectedMenu !== "profit-loss" && (
               <Card>
                 <Title level={3}>
                   {
                     menuItems.find(
-                      (item) =>
-                        item.key ===
-                        selectedMenu
+                      (item) => item.key === selectedMenu
                     )?.label
                   }
                 </Title>
 
                 <Text type="secondary">
-                  This module will be built
-                  next.
+                  This module will be built next.
                 </Text>
               </Card>
             )}
@@ -800,11 +575,8 @@ function Dashboard({ user, onLogout }) {
 }
 
 function App() {
-  const [loggedIn, setLoggedIn] =
-    useState(isLoggedIn());
-
-  const [user, setUser] =
-    useState(getCurrentUser());
+  const [loggedIn, setLoggedIn] = useState(isLoggedIn());
+  const [user, setUser] = useState(getCurrentUser());
 
   const handleLoginSuccess = (data) => {
     setUser(data);
@@ -818,21 +590,10 @@ function App() {
   };
 
   if (!loggedIn) {
-    return (
-      <Login
-        onLoginSuccess={
-          handleLoginSuccess
-        }
-      />
-    );
+    return <Login onLoginSuccess={handleLoginSuccess} />;
   }
 
-  return (
-    <Dashboard
-      user={user}
-      onLogout={handleLogout}
-    />
-  );
+  return <Dashboard user={user} onLogout={handleLogout} />;
 }
 
 export default App;
